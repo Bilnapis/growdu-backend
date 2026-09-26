@@ -1,12 +1,20 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import appConfig from './config/app.config.js';
+import authConfig from './config/auth.config.js';
 
 export function configureApplication(app: INestApplication): void {
   const config = app.get<ConfigType<typeof appConfig>>(appConfig.KEY);
+  const authentication = app.get<ConfigType<typeof authConfig>>(authConfig.KEY);
 
   app.setGlobalPrefix(config.apiPrefix);
+  app.enableCors({
+    origin: authentication.frontendOrigins,
+    credentials: true,
+  });
+  app.use(cookieParser());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -29,6 +37,10 @@ export function configureApplication(app: INestApplication): void {
     )
     .setVersion('1.0')
     .addBearerAuth()
+    .addCookieAuth(authentication.cookieName, {
+      type: 'apiKey',
+      in: 'cookie',
+    })
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

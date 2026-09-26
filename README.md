@@ -34,8 +34,15 @@ Backend Growdu menggunakan NestJS, TypeORM, dan MySQL/MariaDB dari XAMPP.
 
    ```bash
    npm install
+   npm run migration:run
+   npm run provision:owner
    npm run start:dev
    ```
+
+   `provision:owner` membuat tenant awal dan akun OWNER secara atomik. Isi
+   `PROVISION_TENANT_NAME`, `PROVISION_OWNER_EMAIL`, dan
+   `PROVISION_OWNER_PASSWORD` hanya ketika menjalankan command tersebut. Command
+   akan berhenti jika email OWNER sudah terdaftar.
 
 API tersedia di `http://localhost:3000/api/v1`.
 
@@ -66,6 +73,18 @@ request langsung dari browser.
 | `DB_NAME` | Nama database | `growdu` |
 | `DB_LOGGING` | Tampilkan query SQL | `false` |
 | `DB_POOL_SIZE` | Maksimum koneksi pool | `10` |
+| `JWT_ACCESS_SECRET` | Secret penandatangan access token, minimal 32 karakter | wajib |
+| `JWT_ISSUER` | JWT issuer yang diterima API | `growdu-backend` |
+| `JWT_AUDIENCE` | JWT audience yang diterima API | `growdu-web` |
+| `JWT_ACCESS_TTL_SECONDS` | Masa berlaku access token dalam detik | `900` |
+| `AUTH_REFRESH_TTL_DAYS` | Masa berlaku refresh session dalam hari | `7` |
+| `AUTH_COOKIE_NAME` | Nama cookie refresh token | `growdu_refresh_token` |
+| `AUTH_COOKIE_SAME_SITE` | Policy cookie: `lax`, `strict`, atau `none` | `lax` |
+| `AUTH_COOKIE_SECURE` | Kirim cookie hanya melalui HTTPS | `false` (`true` di production) |
+| `FRONTEND_ORIGINS` | Allowlist origin CORS, dipisahkan koma | `http://localhost:5173` |
+| `PROVISION_TENANT_NAME` | Nama tenant untuk command provisioning | hanya command |
+| `PROVISION_OWNER_EMAIL` | Email OWNER untuk command provisioning | hanya command |
+| `PROVISION_OWNER_PASSWORD` | Password OWNER 12–128 karakter | hanya command |
 
 Aplikasi akan berhenti saat startup jika konfigurasi wajib tidak valid.
 
@@ -105,10 +124,47 @@ npm run migration:revert
 
 Untuk deployment, build lebih dahulu lalu jalankan `npm run migration:run:prod`.
 
+Migration tidak dijalankan otomatis saat aplikasi dimulai. Untuk memverifikasi
+reversibilitas, gunakan command berikut. Command membuat database disposable
+dengan nama acak, menjalankan `run → revert → run`, lalu menghapus database itu:
+
+```bash
+npm run migration:verify
+```
+
+## Autentikasi dan akses API
+
+Endpoint aplikasi menggunakan access JWT pada header
+`Authorization: Bearer <token>`. Login juga mengirim refresh token melalui
+cookie `HttpOnly` dengan path `/api/v1/auth`. Client browser harus mengaktifkan
+credentials untuk request login, refresh, dan logout.
+
+- `POST /api/v1/auth/login` menerima email dan password.
+- `POST /api/v1/auth/refresh` merotasi refresh token.
+- `POST /api/v1/auth/logout` mencabut session saat ini.
+- `POST /api/v1/auth/logout-all` mencabut semua session user.
+- `GET /api/v1/auth/me` mengembalikan principal aktif.
+- `PATCH /api/v1/auth/password` mengganti password dan mencabut semua session.
+
+OWNER mengelola akun; OWNER dan ADMIN mengelola data tutor, parent, student,
+serta relasi parent–student. TUTOR hanya membaca profilnya sendiri. PARENT hanya
+membaca profil dan student dengan relasi akses aktif. Endpoint billing belum
+tersedia sampai domain invoice diimplementasikan.
+
+Semua query domain menggunakan tenant dari JWT. `tenantId` dari payload client
+tidak diterima, dan data tenant lain diperlakukan sebagai tidak ditemukan.
+
 ## Quality checks
 
 ```bash
 npm run lint
 npm run test
+npm run test:e2e
 npm run build
+npm run migration:show
 ```
+
+`test:e2e` memerlukan MySQL dan hak untuk membuat/menghapus database. Test
+membuat database disposable berawalan `growdu_e2e_`, menjalankan migration dan
+skenario API, lalu menghapusnya pada teardown. Database pada `DB_NAME` tidak
+diubah oleh suite E2E.

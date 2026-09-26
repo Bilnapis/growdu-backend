@@ -25,4 +25,24 @@ export const environmentValidationSchema = Joi.object({
   DB_NAME: Joi.string().trim().required(),
   DB_LOGGING: Joi.boolean().truthy('true').falsy('false').default(false),
   DB_POOL_SIZE: Joi.number().integer().min(1).max(100).default(10),
+  JWT_ACCESS_SECRET: Joi.string().min(32).required(),
+  JWT_ISSUER: Joi.string().trim().min(1).default('growdu-backend'),
+  JWT_AUDIENCE: Joi.string().trim().min(1).default('growdu-web'),
+  JWT_ACCESS_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(86_400)
+    .default(900),
+  AUTH_REFRESH_TTL_DAYS: Joi.number().integer().min(1).max(90).default(7),
+  AUTH_COOKIE_NAME: Joi.string()
+    .pattern(/^[a-zA-Z0-9_-]+$/)
+    .default('growdu_refresh_token'),
+  AUTH_COOKIE_SAME_SITE: Joi.string()
+    .valid('lax', 'strict', 'none')
+    .default('lax'),
+  AUTH_COOKIE_SECURE: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false),
+  FRONTEND_ORIGINS: Joi.string().trim().default('http://localhost:5173'),
 });

@@ -13,6 +13,8 @@ for (const variable of requiredEnvironmentVariables) {
   }
 }
 
+const isCompiledJavaScript = import.meta.url.endsWith('.js');
+
 const dataSource = new DataSource({
   type: 'mysql',
   host: process.env.DB_HOST,
@@ -20,8 +22,14 @@ const dataSource = new DataSource({
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD ?? '',
   database: process.env.DB_NAME,
-  entities: ['src/**/*.entity.ts', 'dist/**/*.entity.js'],
-  migrations: ['src/database/migrations/*.ts', 'dist/database/migrations/*.js'],
+  entities: [
+    isCompiledJavaScript ? 'dist/**/*.entity.js' : 'src/**/*.entity.ts',
+  ],
+  migrations: [
+    isCompiledJavaScript
+      ? 'dist/database/migrations/*.js'
+      : 'src/database/migrations/*.ts',
+  ],
   synchronize: false,
   logging: process.env.DB_LOGGING === 'true',
   poolSize: Number.parseInt(process.env.DB_POOL_SIZE ?? '10', 10),

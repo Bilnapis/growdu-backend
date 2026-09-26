@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Public } from './auth/decorators/public.decorator.js';
 import { AppService } from './app.service.js';
 
 @ApiTags('System')
@@ -8,6 +9,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
+  @Public()
   @ApiOperation({ summary: 'Periksa status Growdu Backend' })
   @ApiOkResponse({
     description: 'Backend sedang berjalan.',
