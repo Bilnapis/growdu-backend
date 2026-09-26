@@ -5,5 +5,5 @@ export default registerAs('app', () => ({
   port: Number.parseInt(process.env.PORT ?? '3000', 10),
   apiPrefix: process.env.API_PREFIX ?? 'api/v1',
   swaggerEnabled: process.env.SWAGGER_ENABLED !== 'false',
-  swaggerPath: process.env.SWAGGER_PATH ?? 'admin',
+  swaggerPath: process.env.SWAGGER_PATH ?? 'docs',
 }));

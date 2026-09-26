@@ -13,6 +13,7 @@ coverage/
 
 # caches and logs
 .npm-cache/
+.adminjs/
 *.log
 .eslintcache
 

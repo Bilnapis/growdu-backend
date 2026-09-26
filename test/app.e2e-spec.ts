@@ -1,5 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module.js';
@@ -8,12 +8,10 @@ import { configureApplication } from './../src/app.setup.js';
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
+  beforeAll(async () => {
+    app = await NestFactory.create<INestApplication<App>>(AppModule, {
+      logger: false,
+    });
     configureApplication(app);
     await app.init();
   });
@@ -28,11 +26,25 @@ describe('AppController (e2e)', () => {
   it('/admin (GET)', () => {
     return request(app.getHttpServer())
       .get('/admin')
+      .expect(302)
+      .expect('Location', '/admin/login');
+  });
+
+  it('/admin/login (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/admin/login')
+      .expect(200)
+      .expect(/Growdu Admin/);
+  });
+
+  it('/docs (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/docs')
       .expect(200)
       .expect(/Growdu Backend Admin/);
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await app.close();
   });
 });

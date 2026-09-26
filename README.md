@@ -39,9 +39,12 @@ Backend Growdu menggunakan NestJS, TypeORM, dan MySQL/MariaDB dari XAMPP.
 
 API tersedia di `http://localhost:3000/api/v1`.
 
-Dashboard backend tersedia di `http://localhost:3000/admin`. Dashboard Swagger
-ini menampilkan seluruh endpoint dan menyediakan fitur **Try it out** untuk
-menguji request langsung dari browser.
+Admin Panel tersedia di `http://localhost:3000/admin`. Masuk menggunakan
+`ADMIN_EMAIL` dan `ADMIN_PASSWORD` dari `.env`.
+
+Dokumentasi Swagger tersedia di `http://localhost:3000/docs`. Swagger
+menampilkan seluruh endpoint dan menyediakan fitur **Try it out** untuk menguji
+request langsung dari browser.
 
 ## Konfigurasi environment
 
@@ -51,7 +54,11 @@ menguji request langsung dari browser.
 | `PORT` | Port HTTP | `3000` |
 | `API_PREFIX` | Prefix seluruh endpoint | `api/v1` |
 | `SWAGGER_ENABLED` | Aktifkan dashboard Swagger | `true` |
-| `SWAGGER_PATH` | Path dashboard Swagger | `admin` |
+| `SWAGGER_PATH` | Path dokumentasi Swagger | `docs` |
+| `ADMIN_ROOT_PATH` | Path AdminJS | `/admin` |
+| `ADMIN_EMAIL` | Email untuk login AdminJS | wajib |
+| `ADMIN_PASSWORD` | Password AdminJS, minimal 12 karakter | wajib |
+| `ADMIN_COOKIE_SECRET` | Secret session AdminJS, minimal 32 karakter | wajib |
 | `DB_HOST` | Host MySQL XAMPP | `127.0.0.1` |
 | `DB_PORT` | Port MySQL | `3306` |
 | `DB_USERNAME` | User MySQL XAMPP | `root` |
@@ -63,7 +70,9 @@ menguji request langsung dari browser.
 Aplikasi akan berhenti saat startup jika konfigurasi wajib tidak valid.
 
 Untuk production, atur `SWAGGER_ENABLED=false` jika dokumentasi API tidak boleh
-diakses publik.
+diakses publik. Ganti seluruh kredensial AdminJS dan gunakan session store
+persisten seperti Redis; konfigurasi bawaan menggunakan memory store yang hanya
+sesuai untuk development satu instance.
 
 Konfigurasi tersebut menggunakan kredensial default XAMPP. Jika user `root`
 memiliki password, isi `DB_PASSWORD` di `.env`. Jangan gunakan user `root`

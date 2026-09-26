@@ -10,7 +10,14 @@ export const environmentValidationSchema = Joi.object({
   SWAGGER_PATH: Joi.string()
     .trim()
     .pattern(/^[a-zA-Z0-9_-]+$/)
-    .default('admin'),
+    .default('docs'),
+  ADMIN_ROOT_PATH: Joi.string()
+    .trim()
+    .pattern(/^\/[a-zA-Z0-9/_-]+$/)
+    .default('/admin'),
+  ADMIN_EMAIL: Joi.string().email().required(),
+  ADMIN_PASSWORD: Joi.string().min(12).required(),
+  ADMIN_COOKIE_SECRET: Joi.string().min(32).required(),
   DB_HOST: Joi.string().hostname().required(),
   DB_PORT: Joi.number().port().default(3306),
   DB_USERNAME: Joi.string().trim().required(),

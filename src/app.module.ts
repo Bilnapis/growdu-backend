@@ -3,6 +3,8 @@ import { ConfigModule, ConfigType } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { AdminPanelModule } from './admin/admin-panel.module.js';
+import adminConfig from './config/admin.config.js';
 import appConfig from './config/app.config.js';
 import databaseConfig from './config/database.config.js';
 import { environmentValidationSchema } from './config/environment.validation.js';
@@ -12,7 +14,7 @@ import { environmentValidationSchema } from './config/environment.validation.js'
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      load: [appConfig, databaseConfig],
+      load: [adminConfig, appConfig, databaseConfig],
       validationSchema: environmentValidationSchema,
     }),
     TypeOrmModule.forRootAsync({
@@ -33,6 +35,7 @@ import { environmentValidationSchema } from './config/environment.validation.js'
         retryDelay: 3_000,
       }),
     }),
+    AdminPanelModule,
   ],
   controllers: [AppController],
   providers: [AppService],
