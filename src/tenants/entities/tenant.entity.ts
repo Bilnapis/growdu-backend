@@ -2,15 +2,25 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
+import { OwnerEntity } from '../../owners/entities/owner.entity.js';
 
 @Entity({ name: 'tenants' })
 export class TenantEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ name: 'owner_id', type: 'char', length: 36 })
+  ownerId: string;
+
+  @ManyToOne(() => OwnerEntity, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'owner_id' })
+  owner: OwnerEntity;
 
   @Column({ type: 'varchar', length: 150 })
   name: string;

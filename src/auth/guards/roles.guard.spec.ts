@@ -50,8 +50,8 @@ describe('RolesGuard', () => {
       id: 'user-id',
       sessionId: 'session-id',
       tenantId: 'tenant-id',
-      email: 'admin@example.com',
-      role: UserRole.Admin,
+      email: 'operator@example.com',
+      role: UserRole.Operator,
     };
 
     expect(() =>

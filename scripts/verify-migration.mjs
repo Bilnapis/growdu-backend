@@ -32,8 +32,11 @@ try {
   await dataSource.initialize();
 
   const firstRun = await dataSource.runMigrations();
-  if (firstRun.length !== 1) {
-    throw new Error('Expected exactly one migration on the first run');
+  const expectedMigrationCount = dataSource.migrations.length;
+  if (firstRun.length !== expectedMigrationCount) {
+    throw new Error(
+      `Expected ${expectedMigrationCount} migrations on the first run, received ${firstRun.length}`,
+    );
   }
 
   await dataSource.undoLastMigration();

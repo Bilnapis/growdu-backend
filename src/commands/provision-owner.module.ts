@@ -6,6 +6,7 @@ import { SecurityModule } from '../common/security/security.module.js';
 import databaseConfig from '../config/database.config.js';
 import provisionConfig from '../config/provision.config.js';
 import { TenantEntity } from '../tenants/entities/tenant.entity.js';
+import { OwnerEntity } from '../owners/entities/owner.entity.js';
 import { UserEntity } from '../users/entities/user.entity.js';
 import { ProvisionOwnerService } from './provision-owner.service.js';
 
@@ -24,6 +25,12 @@ import { ProvisionOwnerService } from './provision-owner.service.js';
         DB_LOGGING: Joi.boolean().truthy('true').falsy('false').default(false),
         DB_POOL_SIZE: Joi.number().integer().min(1).max(100).default(10),
         PROVISION_TENANT_NAME: Joi.string().trim().min(2).max(150).required(),
+        PROVISION_OWNER_NAME: Joi.string().trim().min(2).max(150).required(),
+        PROVISION_OWNER_PHONE_NUMBER: Joi.string()
+          .trim()
+          .min(6)
+          .max(20)
+          .required(),
         PROVISION_OWNER_EMAIL: Joi.string().email().max(150).required(),
         PROVISION_OWNER_PASSWORD: Joi.string().min(12).max(128).required(),
       }),
@@ -39,12 +46,12 @@ import { ProvisionOwnerService } from './provision-owner.service.js';
         database: config.name,
         logging: config.logging,
         poolSize: config.poolSize,
-        entities: [TenantEntity, UserEntity],
+        entities: [TenantEntity, OwnerEntity, UserEntity],
         synchronize: false,
         migrationsRun: false,
       }),
     }),
-    TypeOrmModule.forFeature([TenantEntity, UserEntity]),
+    TypeOrmModule.forFeature([TenantEntity, OwnerEntity, UserEntity]),
     SecurityModule,
   ],
   providers: [ProvisionOwnerService],

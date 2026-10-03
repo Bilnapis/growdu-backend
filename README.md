@@ -36,6 +36,7 @@ Backend Growdu menggunakan NestJS, TypeORM, dan MySQL/MariaDB dari XAMPP.
    npm install
    npm run migration:run
    npm run provision:owner
+   npm run provision:platform-admin
    npm run start:dev
    ```
 
@@ -44,10 +45,19 @@ Backend Growdu menggunakan NestJS, TypeORM, dan MySQL/MariaDB dari XAMPP.
    `PROVISION_OWNER_PASSWORD` hanya ketika menjalankan command tersebut. Command
    akan berhenti jika email OWNER sudah terdaftar.
 
+   `provision:platform-admin` membuat akun untuk panel frontend BimbelKit.
+   Isi `PLATFORM_ADMIN_EMAIL` dan `PLATFORM_ADMIN_PASSWORD` hanya ketika
+   menjalankan command tersebut. Akun ini terpisah dari akun OWNER/Operator
+   bimbel dan dapat dibuat lebih dari satu kali menggunakan email berbeda.
+
 API tersedia di `http://localhost:3000/api/v1`.
 
-Admin Panel tersedia di `http://localhost:3000/admin`. Masuk menggunakan
+AdminJS internal tersedia di `http://localhost:3000/backend-admin`. Masuk menggunakan
 `ADMIN_EMAIL` dan `ADMIN_PASSWORD` dari `.env`.
+
+Panel Super Admin frontend menggunakan autentikasi API pada
+`/api/v1/platform-admin/auth/*`; route UI-nya dikelola oleh aplikasi frontend
+di `/admin`.
 
 Dokumentasi Swagger tersedia di `http://localhost:3000/docs`. Swagger
 menampilkan seluruh endpoint dan menyediakan fitur **Try it out** untuk menguji
@@ -62,7 +72,7 @@ request langsung dari browser.
 | `API_PREFIX` | Prefix seluruh endpoint | `api/v1` |
 | `SWAGGER_ENABLED` | Aktifkan dashboard Swagger | `true` |
 | `SWAGGER_PATH` | Path dokumentasi Swagger | `docs` |
-| `ADMIN_ROOT_PATH` | Path AdminJS | `/admin` |
+| `ADMIN_ROOT_PATH` | Path AdminJS internal | `/backend-admin` |
 | `ADMIN_EMAIL` | Email untuk login AdminJS | wajib |
 | `ADMIN_PASSWORD` | Password AdminJS, minimal 12 karakter | wajib |
 | `ADMIN_COOKIE_SECRET` | Secret session AdminJS, minimal 32 karakter | wajib |
@@ -81,9 +91,11 @@ request langsung dari browser.
 | `AUTH_COOKIE_NAME` | Nama cookie refresh token | `growdu_refresh_token` |
 | `AUTH_COOKIE_SAME_SITE` | Policy cookie: `lax`, `strict`, atau `none` | `lax` |
 | `AUTH_COOKIE_SECURE` | Kirim cookie hanya melalui HTTPS | `false` (`true` di production) |
-| `FRONTEND_ORIGINS` | Allowlist origin CORS, dipisahkan koma | `http://localhost:5173` |
+| `FRONTEND_ORIGINS` | Allowlist origin CORS, dipisahkan koma. Saat `NODE_ENV=development`, origin lokal `http://localhost:<port>` juga diizinkan untuk dev server Vite. | `http://localhost:5174` |
 | `PROVISION_TENANT_NAME` | Nama tenant untuk command provisioning | hanya command |
 | `PROVISION_OWNER_EMAIL` | Email OWNER untuk command provisioning | hanya command |
+| `PLATFORM_ADMIN_EMAIL` | Email super-admin untuk command provisioning | hanya command |
+| `PLATFORM_ADMIN_PASSWORD` | Password super-admin 5-128 karakter | hanya command |
 | `PROVISION_OWNER_PASSWORD` | Password OWNER 12–128 karakter | hanya command |
 
 Aplikasi akan berhenti saat startup jika konfigurasi wajib tidak valid.

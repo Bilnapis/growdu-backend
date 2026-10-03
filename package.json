@@ -32,7 +32,8 @@
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
     "migration:run:prod": "npm run typeorm:prod -- migration:run",
-    "provision:owner": "npm run build && node dist/commands/provision-owner.js"
+    "provision:owner": "npm run build && node dist/commands/provision-owner.js",
+    "provision:platform-admin": "npm run build && node dist/commands/provision-platform-admin.js"
   },
   "dependencies": {
     "@adminjs/express": "^6.1.1",

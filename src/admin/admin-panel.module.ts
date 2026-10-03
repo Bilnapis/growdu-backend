@@ -46,6 +46,9 @@ const adminJsModule = import('@adminjs/nestjs').then(({ AdminModule }) =>
                     isTitle: true,
                     isRequired: true,
                   },
+                  ownerId: {
+                    isRequired: true,
+                  },
                   address: {
                     type: 'textarea',
                   },
@@ -72,9 +75,16 @@ const adminJsModule = import('@adminjs/nestjs').then(({ AdminModule }) =>
                     },
                   },
                 },
-                listProperties: ['name', 'email', 'whatsappNumber', 'status'],
+                listProperties: [
+                  'name',
+                  'ownerId',
+                  'email',
+                  'whatsappNumber',
+                  'status',
+                ],
                 showProperties: [
                   'id',
+                  'ownerId',
                   'name',
                   'address',
                   'whatsappNumber',
@@ -85,6 +95,7 @@ const adminJsModule = import('@adminjs/nestjs').then(({ AdminModule }) =>
                   'updatedAt',
                 ],
                 editProperties: [
+                  'ownerId',
                   'name',
                   'address',
                   'whatsappNumber',

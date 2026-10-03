@@ -31,14 +31,15 @@ type TenantPropertyDefinition = {
 
 const TENANT_PROPERTIES: TenantPropertyDefinition[] = [
   { path: 'id', type: 'uuid', isId: true, position: 0 },
-  { path: 'name', type: 'string', position: 1 },
-  { path: 'address', type: 'textarea', position: 2 },
-  { path: 'whatsappNumber', type: 'phone', position: 3 },
-  { path: 'email', type: 'string', position: 4 },
-  { path: 'logoUrl', type: 'string', position: 5 },
-  { path: 'status', type: 'string', position: 6 },
-  { path: 'createdAt', type: 'datetime', position: 7 },
-  { path: 'updatedAt', type: 'datetime', position: 8 },
+  { path: 'ownerId', type: 'uuid', position: 1 },
+  { path: 'name', type: 'string', position: 2 },
+  { path: 'address', type: 'textarea', position: 3 },
+  { path: 'whatsappNumber', type: 'phone', position: 4 },
+  { path: 'email', type: 'string', position: 5 },
+  { path: 'logoUrl', type: 'string', position: 6 },
+  { path: 'status', type: 'string', position: 7 },
+  { path: 'createdAt', type: 'datetime', position: 8 },
+  { path: 'updatedAt', type: 'datetime', position: 9 },
 ];
 
 export class TenantAdminResource extends BaseResource {
@@ -130,7 +131,9 @@ export class TenantAdminResource extends BaseResource {
     return new BaseRecord(this.prepareParams(params), this);
   }
 
-  override async create(params: Record<string, unknown>): Promise<TenantParams> {
+  override async create(
+    params: Record<string, unknown>,
+  ): Promise<TenantParams> {
     const tenant = this.repository.create(this.prepareTenant(params, true));
     await this.validateTenant(tenant);
 
@@ -246,6 +249,10 @@ export class TenantAdminResource extends BaseResource {
       tenant.name = this.toNullableString(params.name) ?? '';
     }
 
+    if (includeMissingProperties || Object.hasOwn(params, 'ownerId')) {
+      tenant.ownerId = this.toNullableString(params.ownerId) ?? '';
+    }
+
     if (includeMissingProperties || Object.hasOwn(params, 'address')) {
       tenant.address = this.toNullableString(params.address);
     }
@@ -275,6 +282,7 @@ export class TenantAdminResource extends BaseResource {
   private prepareParams(params: Record<string, unknown>): TenantParams {
     return {
       id: this.toNullableString(params.id),
+      ownerId: this.toNullableString(params.ownerId),
       name: this.toNullableString(params.name),
       address: this.toNullableString(params.address),
       whatsappNumber: this.toNullableString(params.whatsappNumber),
@@ -303,6 +311,7 @@ export class TenantAdminResource extends BaseResource {
   private toParams(tenant: TenantEntity): TenantParams {
     return {
       id: tenant.id,
+      ownerId: tenant.ownerId,
       name: tenant.name,
       address: tenant.address,
       whatsappNumber: tenant.whatsappNumber,

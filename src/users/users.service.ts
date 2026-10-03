@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -16,7 +17,6 @@ import { PasswordHashService } from '../common/security/password-hash.service.js
 import { TenantEntity } from '../tenants/entities/tenant.entity.js';
 import {
   CreateUserDto,
-  ManagedUserRole,
   ResetPasswordDto,
   UpdateUserDto,
   UsersQueryDto,
@@ -51,24 +51,11 @@ export class UsersService {
   }
 
   async create(tenantId: string, dto: CreateUserDto): Promise<UserResponseDto> {
-    const user = this.usersRepository.create({
-      tenantId,
-      email: dto.email,
-      passwordHash: await this.passwordHashService.hash(dto.password),
-      role:
-        dto.role === ManagedUserRole.Owner ? UserRole.Owner : UserRole.Admin,
-      status: EntityStatus.Active,
-      lastLoginAt: null,
-    });
-
-    try {
-      return UserResponseDto.fromEntity(await this.usersRepository.save(user));
-    } catch (error: unknown) {
-      if (isDuplicateEntryError(error)) {
-        throw new ConflictException('Email is already registered');
-      }
-      throw error;
-    }
+    void tenantId;
+    void dto;
+    throw new BadRequestException(
+      'Create operators through POST /tenants/:tenantId/operators. Owners are provisioned separately.',
+    );
   }
 
   async update(
@@ -160,8 +147,8 @@ export class UsersService {
     return this.usersRepository.findByIdWithTenant(id);
   }
 
-  findWithPassword(id: string, tenantId: string): Promise<UserEntity | null> {
-    return this.usersRepository.findByIdWithPassword(id, tenantId);
+  findWithPassword(id: string): Promise<UserEntity | null> {
+    return this.usersRepository.findByIdWithPassword(id);
   }
 
   saveEntity(user: UserEntity): Promise<UserEntity> {

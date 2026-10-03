@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AdminPanelModule } from './admin/admin-panel.module.js';
+import { OperatorsModule } from './operators/operators.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import adminConfig from './config/admin.config.js';
 import appConfig from './config/app.config.js';
@@ -11,6 +12,8 @@ import authConfig from './config/auth.config.js';
 import databaseConfig from './config/database.config.js';
 import { environmentValidationSchema } from './config/environment.validation.js';
 import { ParentsModule } from './parents/parents.module.js';
+import { PlatformAdminModule } from './platform-admin/platform-admin.module.js';
+import { OwnersModule } from './owners/owners.module.js';
 import { StudentsModule } from './students/students.module.js';
 import { TenantsModule } from './tenants/tenants.module.js';
 import { TutorsModule } from './tutors/tutors.module.js';
@@ -43,11 +46,14 @@ import { UsersModule } from './users/users.module.js';
       }),
     }),
     AuthModule,
+    OwnersModule,
+    OperatorsModule,
     TenantsModule,
     UsersModule,
     TutorsModule,
     ParentsModule,
     StudentsModule,
+    PlatformAdminModule,
     AdminPanelModule,
   ],
   controllers: [AppController],

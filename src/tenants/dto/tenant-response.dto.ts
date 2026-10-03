@@ -6,6 +6,9 @@ export class TenantResponseDto {
   @ApiProperty({ format: 'uuid' })
   id: string;
 
+  @ApiProperty({ format: 'uuid' })
+  ownerId: string;
+
   @ApiProperty()
   name: string;
 
@@ -33,6 +36,7 @@ export class TenantResponseDto {
   static fromEntity(entity: TenantEntity): TenantResponseDto {
     return {
       id: entity.id,
+      ownerId: entity.ownerId,
       name: entity.name,
       address: entity.address,
       whatsappNumber: entity.whatsappNumber,

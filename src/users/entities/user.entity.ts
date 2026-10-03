@@ -13,7 +13,7 @@ import { TenantEntity } from '../../tenants/entities/tenant.entity.js';
 
 export enum UserRole {
   Owner = 'owner',
-  Admin = 'admin',
+  Operator = 'operator',
   Tutor = 'tutor',
   Parent = 'parent',
 }
@@ -25,12 +25,12 @@ export class UserEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'tenant_id', type: 'char', length: 36 })
-  tenantId: string;
+  @Column({ name: 'tenant_id', type: 'char', length: 36, nullable: true })
+  tenantId: string | null;
 
-  @ManyToOne(() => TenantEntity, { nullable: false, onDelete: 'RESTRICT' })
+  @ManyToOne(() => TenantEntity, { nullable: true, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'tenant_id' })
-  tenant: TenantEntity;
+  tenant: TenantEntity | null;
 
   @Index('UQ_users_email', { unique: true })
   @Column({ type: 'varchar', length: 150 })

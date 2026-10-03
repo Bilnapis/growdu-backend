@@ -30,7 +30,7 @@ export default registerAs('auth', () => {
     cookieName: process.env.AUTH_COOKIE_NAME ?? 'growdu_refresh_token',
     cookieSameSite,
     cookieSecure,
-    frontendOrigins: (process.env.FRONTEND_ORIGINS ?? 'http://localhost:5173')
+    frontendOrigins: (process.env.FRONTEND_ORIGINS ?? 'http://localhost:5174')
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),

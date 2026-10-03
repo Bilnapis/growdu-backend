@@ -6,8 +6,8 @@ export class UserResponseDto {
   @ApiProperty({ format: 'uuid' })
   id: string;
 
-  @ApiProperty({ format: 'uuid' })
-  tenantId: string;
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  tenantId: string | null;
 
   @ApiProperty({ format: 'email' })
   email: string;

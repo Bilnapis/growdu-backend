@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import { isAllowedFrontendOrigin } from './auth/allowed-origin.util.js';
 import appConfig from './config/app.config.js';
 import authConfig from './config/auth.config.js';
 
@@ -11,7 +12,24 @@ export function configureApplication(app: INestApplication): void {
 
   app.setGlobalPrefix(config.apiPrefix);
   app.enableCors({
-    origin: authentication.frontendOrigins,
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => {
+      if (
+        !origin ||
+        isAllowedFrontendOrigin(
+          origin,
+          authentication.frontendOrigins,
+          config.nodeEnv,
+        )
+      ) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, false);
+    },
     credentials: true,
   });
   app.use(cookieParser());

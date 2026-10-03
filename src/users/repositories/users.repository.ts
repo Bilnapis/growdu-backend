@@ -39,15 +39,11 @@ export class UsersRepository {
       .getOne();
   }
 
-  findByIdWithPassword(
-    id: string,
-    tenantId: string,
-  ): Promise<UserEntity | null> {
+  findByIdWithPassword(id: string): Promise<UserEntity | null> {
     return this.repository
       .createQueryBuilder('user')
       .addSelect('user.passwordHash')
       .where('user.id = :id', { id })
-      .andWhere('user.tenant_id = :tenantId', { tenantId })
       .getOne();
   }
 

@@ -20,6 +20,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
+import { TenantScoped } from '../auth/decorators/tenant-scoped.decorator.js';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type.js';
 import { PaginatedResponse } from '../common/dto/pagination-query.dto.js';
 import { ApiPaginatedResponse } from '../common/swagger/api-paginated-response.decorator.js';
@@ -43,7 +44,8 @@ import { StudentsService } from './students.service.js';
 @ApiTags('Students')
 @ApiBearerAuth()
 @ApiProtectedEndpointErrors()
-@Roles(UserRole.Owner, UserRole.Admin)
+@Roles(UserRole.Owner, UserRole.Operator)
+@TenantScoped()
 @Controller('students')
 export class StudentsController {
   constructor(private readonly studentsService: StudentsService) {}

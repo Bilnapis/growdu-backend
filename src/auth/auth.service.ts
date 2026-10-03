@@ -8,6 +8,8 @@ import { EntityStatus } from '../common/enums/entity-status.enum.js';
 import { PasswordHashService } from '../common/security/password-hash.service.js';
 import authConfig from '../config/auth.config.js';
 import { ParentEntity } from '../parents/entities/parent.entity.js';
+import { OperatorEntity } from '../operators/entities/operator.entity.js';
+import { OwnerEntity } from '../owners/entities/owner.entity.js';
 import { TutorEntity } from '../tutors/entities/tutor.entity.js';
 import { UserEntity, UserRole } from '../users/entities/user.entity.js';
 import { UsersService } from '../users/users.service.js';
@@ -41,6 +43,10 @@ export class AuthService {
     private readonly tutorsRepository: Repository<TutorEntity>,
     @InjectRepository(ParentEntity)
     private readonly parentsRepository: Repository<ParentEntity>,
+    @InjectRepository(OperatorEntity)
+    private readonly operatorsRepository: Repository<OperatorEntity>,
+    @InjectRepository(OwnerEntity)
+    private readonly ownersRepository: Repository<OwnerEntity>,
     @Inject(authConfig.KEY)
     private readonly config: ConfigType<typeof authConfig>,
   ) {}
@@ -162,10 +168,7 @@ export class AuthService {
     user: AuthenticatedUser,
     dto: ChangePasswordDto,
   ): Promise<void> {
-    const entity = await this.usersService.findWithPassword(
-      user.id,
-      user.tenantId,
-    );
+    const entity = await this.usersService.findWithPassword(user.id);
     if (
       !entity ||
       !(await this.passwordHashService.verify(
@@ -198,7 +201,6 @@ export class AuthService {
       !user ||
       session.userId !== user.id ||
       session.expiresAt.getTime() <= Date.now() ||
-      user.tenantId !== payload.tenantId ||
       user.role !== payload.role
     ) {
       throw this.invalidSession();
@@ -207,7 +209,7 @@ export class AuthService {
     return {
       id: user.id,
       sessionId: session.id,
-      tenantId: user.tenantId,
+      tenantId: user.tenantId ?? '',
       email: user.email,
       role: user.role,
     };
@@ -233,7 +235,6 @@ export class AuthService {
     const payload: JwtPayload = {
       sub: user.id,
       sid: sessionId,
-      tenantId: user.tenantId,
       role: user.role,
     };
     return {
@@ -254,7 +255,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       status: user.status,
-      tenantName: user.tenant.name,
+      tenantName: user.tenant?.name ?? null,
       profileId: profile?.id ?? null,
       profileName: profile?.name ?? null,
     };
@@ -263,18 +264,44 @@ export class AuthService {
   private async assertAccountActive(
     user: UserEntity,
   ): Promise<ProfileSummary | null> {
+    if (user.status !== EntityStatus.Active) {
+      throw this.invalidCredentials();
+    }
+
+    if (user.role === UserRole.Owner) {
+      const owner = await this.ownersRepository.findOne({
+        where: { userId: user.id, status: EntityStatus.Active },
+      });
+      if (!owner) throw this.invalidCredentials();
+      return { id: owner.id, name: owner.name };
+    }
+
+    const tenantId = user.tenantId;
     if (
-      user.status !== EntityStatus.Active ||
+      !tenantId ||
+      !user.tenant ||
       user.tenant.status !== EntityStatus.Active
     ) {
       throw this.invalidCredentials();
+    }
+
+    if (user.role === UserRole.Operator) {
+      const operator = await this.operatorsRepository.findOne({
+        where: {
+          userId: user.id,
+          tenantId,
+          status: EntityStatus.Active,
+        },
+      });
+      if (!operator) throw this.invalidCredentials();
+      return { id: operator.id, name: operator.name };
     }
 
     if (user.role === UserRole.Tutor) {
       const tutor = await this.tutorsRepository.findOne({
         where: {
           userId: user.id,
-          tenantId: user.tenantId,
+          tenantId,
           status: EntityStatus.Active,
         },
       });
@@ -286,7 +313,7 @@ export class AuthService {
       const parent = await this.parentsRepository.findOne({
         where: {
           userId: user.id,
-          tenantId: user.tenantId,
+          tenantId,
           status: EntityStatus.Active,
         },
       });

@@ -16,7 +16,7 @@ import { UserRole } from '../entities/user.entity.js';
 
 export enum ManagedUserRole {
   Owner = 'owner',
-  Admin = 'admin',
+  Operator = 'operator',
 }
 
 export class CreateUserDto {

@@ -11,7 +11,6 @@ import { JwtPayload } from './types/jwt-payload.type.js';
 interface UnknownJwtPayload {
   sub?: unknown;
   sid?: unknown;
-  tenantId?: unknown;
   role?: unknown;
 }
 
@@ -35,7 +34,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (
       typeof value.sub !== 'string' ||
       typeof value.sid !== 'string' ||
-      typeof value.tenantId !== 'string' ||
       !Object.values(UserRole).includes(value.role as UserRole)
     ) {
       throw new UnauthorizedException('Invalid access token');
@@ -43,7 +41,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const payload: JwtPayload = {
       sub: value.sub,
       sid: value.sid,
-      tenantId: value.tenantId,
       role: value.role as UserRole,
     };
     return this.authService.validateAccessToken(payload);

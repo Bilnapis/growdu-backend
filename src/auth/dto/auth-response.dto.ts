@@ -6,8 +6,8 @@ export class AuthUserResponseDto {
   @ApiProperty({ format: 'uuid' })
   id: string;
 
-  @ApiProperty({ format: 'uuid' })
-  tenantId: string;
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  tenantId: string | null;
 
   @ApiProperty({ format: 'email' })
   email: string;
@@ -18,8 +18,8 @@ export class AuthUserResponseDto {
   @ApiProperty({ enum: EntityStatus })
   status: EntityStatus;
 
-  @ApiProperty()
-  tenantName: string;
+  @ApiPropertyOptional({ nullable: true })
+  tenantName: string | null;
 
   @ApiPropertyOptional({ format: 'uuid', nullable: true })
   profileId: string | null;

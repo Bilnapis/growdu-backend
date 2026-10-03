@@ -14,7 +14,7 @@ export const environmentValidationSchema = Joi.object({
   ADMIN_ROOT_PATH: Joi.string()
     .trim()
     .pattern(/^\/[a-zA-Z0-9/_-]+$/)
-    .default('/admin'),
+    .default('/backend-admin'),
   ADMIN_EMAIL: Joi.string().email().required(),
   ADMIN_PASSWORD: Joi.string().min(12).required(),
   ADMIN_COOKIE_SECRET: Joi.string().min(32).required(),
@@ -44,5 +44,5 @@ export const environmentValidationSchema = Joi.object({
     .truthy('true')
     .falsy('false')
     .default(false),
-  FRONTEND_ORIGINS: Joi.string().trim().default('http://localhost:5173'),
+  FRONTEND_ORIGINS: Joi.string().trim().default('http://localhost:5174'),
 });

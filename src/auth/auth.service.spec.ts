@@ -8,7 +8,8 @@ import { EntityStatus } from '../common/enums/entity-status.enum.js';
 import { PasswordHashService } from '../common/security/password-hash.service.js';
 import authConfig from '../config/auth.config.js';
 import { ParentEntity } from '../parents/entities/parent.entity.js';
-import { TenantEntity } from '../tenants/entities/tenant.entity.js';
+import { OperatorEntity } from '../operators/entities/operator.entity.js';
+import { OwnerEntity } from '../owners/entities/owner.entity.js';
 import { TutorEntity } from '../tutors/entities/tutor.entity.js';
 import { UserEntity, UserRole } from '../users/entities/user.entity.js';
 import { UsersService } from '../users/users.service.js';
@@ -25,19 +26,14 @@ const authConfiguration = {
   cookieName: 'growdu_refresh_token',
   cookieSameSite: 'lax' as const,
   cookieSecure: false,
-  frontendOrigins: ['http://localhost:5173'],
+  frontendOrigins: ['http://localhost:5174'],
 };
 
 function createActiveOwner(): UserEntity {
-  const tenant = Object.assign(new TenantEntity(), {
-    id: 'tenant-id',
-    name: 'GrowDu Test',
-    status: EntityStatus.Active,
-  });
   return Object.assign(new UserEntity(), {
     id: 'user-id',
-    tenantId: tenant.id,
-    tenant,
+    tenantId: null,
+    tenant: null,
     email: 'owner@example.com',
     passwordHash: 'stored-password-hash',
     role: UserRole.Owner,
@@ -68,6 +64,8 @@ describe('AuthService', () => {
     hash: ReturnType<typeof vi.fn>;
     verify: ReturnType<typeof vi.fn>;
   };
+  let ownersRepository: { findOne: ReturnType<typeof vi.fn> };
+  let jwtService: { signAsync: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     activeSession = null;
@@ -121,6 +119,17 @@ describe('AuthService', () => {
       hash: vi.fn().mockResolvedValue('dummy-hash'),
       verify: vi.fn().mockResolvedValue(true),
     };
+    ownersRepository = {
+      findOne: vi.fn().mockResolvedValue(
+        Object.assign(new OwnerEntity(), {
+          id: 'owner-profile-id',
+          userId: user.id,
+          name: 'Owner Test',
+          status: EntityStatus.Active,
+        }),
+      ),
+    };
+    jwtService = { signAsync: vi.fn().mockResolvedValue('access-token') };
 
     module = await Test.createTestingModule({
       providers: [
@@ -130,7 +139,7 @@ describe('AuthService', () => {
         { provide: PasswordHashService, useValue: passwordHashService },
         {
           provide: JwtService,
-          useValue: { signAsync: vi.fn().mockResolvedValue('access-token') },
+          useValue: jwtService,
         },
         {
           provide: getRepositoryToken(TutorEntity),
@@ -143,6 +152,16 @@ describe('AuthService', () => {
           useValue: { findOne: vi.fn() } satisfies Partial<
             Repository<ParentEntity>
           >,
+        },
+        {
+          provide: getRepositoryToken(OperatorEntity),
+          useValue: { findOne: vi.fn() } satisfies Partial<
+            Repository<OperatorEntity>
+          >,
+        },
+        {
+          provide: getRepositoryToken(OwnerEntity),
+          useValue: ownersRepository satisfies Partial<Repository<OwnerEntity>>,
         },
         { provide: authConfig.KEY, useValue: authConfiguration },
       ],
@@ -200,10 +219,23 @@ describe('AuthService', () => {
     expect(activeSession?.revokedAt).toBeInstanceOf(Date);
   });
 
-  it('rejects an inactive tenant before creating a session', async () => {
+  it('signs owner access tokens without tenant data', async () => {
+    await service.login({
+      email: 'owner@example.com',
+      password: 'valid password',
+    });
+
+    expect(jwtService.signAsync).toHaveBeenCalledWith({
+      sub: 'user-id',
+      sid: '00000000-0000-4000-8000-000000000001',
+      role: UserRole.Owner,
+    });
+  });
+
+  it('rejects an inactive owner profile before creating a session', async () => {
     const user = createActiveOwner();
-    user.tenant.status = EntityStatus.Inactive;
     usersService.findForAuthenticationByEmail.mockResolvedValueOnce(user);
+    ownersRepository.findOne.mockResolvedValueOnce(null);
 
     await expect(
       service.login({
