@@ -12,6 +12,8 @@ import { PlatformAdminAuthController } from './platform-admin-auth.controller.js
 import { PlatformAdminAuthService } from './platform-admin-auth.service.js';
 import { PlatformAdminUsersController } from './platform-admin-users.controller.js';
 import { PlatformAdminUsersService } from './platform-admin-users.service.js';
+import { PlatformAdminTenantsController } from './platform-admin-tenants.controller.js';
+import { PlatformAdminTenantsService } from './platform-admin-tenants.service.js';
 import { AuthSessionEntity } from '../auth/entities/auth-session.entity.js';
 import { OwnerEntity } from '../owners/entities/owner.entity.js';
 import { OperatorEntity } from '../operators/entities/operator.entity.js';
@@ -47,11 +49,16 @@ import { UserEntity } from '../users/entities/user.entity.js';
       }),
     }),
   ],
-  controllers: [PlatformAdminAuthController, PlatformAdminUsersController],
+  controllers: [
+    PlatformAdminAuthController,
+    PlatformAdminUsersController,
+    PlatformAdminTenantsController,
+  ],
   providers: [
     PlatformAdminAuthService,
     PlatformAdminAccessGuard,
     PlatformAdminUsersService,
+    PlatformAdminTenantsService,
   ],
   exports: [PlatformAdminAuthService],
 })
