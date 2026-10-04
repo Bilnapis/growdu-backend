@@ -12,6 +12,11 @@ export class TenantsService {
     return TenantResponseDto.fromEntity(tenant);
   }
 
+  async findActiveOwnedByUser(userId: string): Promise<TenantResponseDto[]> {
+    const tenants = await this.tenantsRepository.findActiveByOwnerUserId(userId);
+    return tenants.map((tenant) => TenantResponseDto.fromEntity(tenant));
+  }
+
   async updateCurrent(
     tenantId: string,
     dto: UpdateTenantDto,

@@ -1,12 +1,14 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
+import { type NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import { join } from 'node:path';
 import { isAllowedFrontendOrigin } from './auth/allowed-origin.util.js';
 import appConfig from './config/app.config.js';
 import authConfig from './config/auth.config.js';
 
-export function configureApplication(app: INestApplication): void {
+export function configureApplication(app: NestExpressApplication): void {
   const config = app.get<ConfigType<typeof appConfig>>(appConfig.KEY);
   const authentication = app.get<ConfigType<typeof authConfig>>(authConfig.KEY);
 
@@ -33,6 +35,9 @@ export function configureApplication(app: INestApplication): void {
     credentials: true,
   });
   app.use(cookieParser());
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads',
+  });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

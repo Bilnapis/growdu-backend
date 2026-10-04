@@ -5,6 +5,9 @@ export const environmentValidationSchema = Joi.object({
     .valid('development', 'test', 'production')
     .default('development'),
   PORT: Joi.number().port().default(3000),
+  PUBLIC_BASE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).default(
+    'http://localhost:3000',
+  ),
   API_PREFIX: Joi.string().trim().default('api/v1'),
   SWAGGER_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),
   SWAGGER_PATH: Joi.string()

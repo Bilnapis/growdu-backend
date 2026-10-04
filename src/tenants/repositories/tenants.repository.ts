@@ -14,6 +14,16 @@ export class TenantsRepository {
     return this.repository.findOne({ where: { id } });
   }
 
+  findActiveByOwnerUserId(userId: string): Promise<TenantEntity[]> {
+    return this.repository
+      .createQueryBuilder('tenant')
+      .innerJoin('tenant.owner', 'owner')
+      .where('owner.user_id = :userId', { userId })
+      .andWhere('tenant.status = :status', { status: 'active' })
+      .orderBy('tenant.name', 'ASC')
+      .getMany()
+  }
+
   save(tenant: TenantEntity): Promise<TenantEntity> {
     return this.repository.save(tenant);
   }

@@ -4,7 +4,6 @@ import {
   IsEnum,
   IsOptional,
   IsString,
-  IsUrl,
   IsUUID,
   MaxLength,
   MinLength,
@@ -13,6 +12,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { UpdateTenantDto } from '../../tenants/dto/update-tenant.dto.js';
+import { IsTenantLogoUrl } from '../../tenants/dto/tenant-logo-url.validator.js';
 
 function trimNullable(value: unknown): unknown {
   return typeof value === 'string' ? value.trim() : value;
@@ -53,10 +53,14 @@ export class PlatformAdminCreateTenantDto {
   @MaxLength(150)
   email?: string | null;
 
-  @ApiPropertyOptional({ nullable: true, maxLength: 500 })
+  @ApiPropertyOptional({
+    nullable: true,
+    maxLength: 500,
+    description: 'URL HTTP(S) atau path logo internal hasil upload',
+  })
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => trimNullable(value))
-  @IsUrl({ require_protocol: true })
+  @IsTenantLogoUrl()
   @MaxLength(500)
   logoUrl?: string | null;
 

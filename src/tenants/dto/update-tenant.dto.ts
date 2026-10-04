@@ -3,13 +3,13 @@ import {
   IsEmail,
   IsOptional,
   IsString,
-  IsUrl,
   MaxLength,
   MinLength,
   IsEnum,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
+import { IsTenantLogoUrl } from './tenant-logo-url.validator.js';
 
 function trimNullable(value: unknown): unknown {
   return typeof value === 'string' ? value.trim() : value;
@@ -47,10 +47,14 @@ export class UpdateTenantDto {
   @MaxLength(150)
   email?: string | null;
 
-  @ApiPropertyOptional({ nullable: true, maxLength: 500 })
+  @ApiPropertyOptional({
+    nullable: true,
+    maxLength: 500,
+    description: 'URL HTTP(S) atau path logo internal hasil upload',
+  })
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => trimNullable(value))
-  @IsUrl({ require_protocol: true })
+  @IsTenantLogoUrl()
   @MaxLength(500)
   logoUrl?: string | null;
 

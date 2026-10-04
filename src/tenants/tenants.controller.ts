@@ -18,12 +18,22 @@ import { TenantsService } from './tenants.service.js';
 @ApiTags('Tenants')
 @ApiBearerAuth()
 @ApiProtectedEndpointErrors()
-@TenantScoped()
 @Controller('tenants')
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
 
+  @Get('owned')
+  @Roles(UserRole.Owner)
+  @ApiOperation({ summary: 'Ambil daftar bimbel aktif milik owner' })
+  @ApiOkResponse({ type: [TenantResponseDto] })
+  findOwned(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<TenantResponseDto[]> {
+    return this.tenantsService.findActiveOwnedByUser(user.id);
+  }
+
   @Get('me')
+  @TenantScoped()
   @ApiOperation({ summary: 'Ambil tenant milik user yang sedang login' })
   @ApiOkResponse({ type: TenantResponseDto })
   findCurrent(
@@ -33,6 +43,7 @@ export class TenantsController {
   }
 
   @Patch('me')
+  @TenantScoped()
   @Roles(UserRole.Owner, UserRole.Operator)
   @ApiOperation({ summary: 'Perbarui identitas tenant saat ini' })
   @ApiOkResponse({ type: TenantResponseDto })
