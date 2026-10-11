@@ -40,6 +40,27 @@ export class TutorEntity {
   @Column({ name: 'phone_number', type: 'varchar', length: 20 })
   phoneNumber: string;
 
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  email: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  address: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  expertise: string | null;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  education: string | null;
+
+  @Column({ name: 'bank_name', type: 'varchar', length: 100, nullable: true })
+  bankName: string | null;
+
+  @Column({ name: 'account_name', type: 'varchar', length: 150, nullable: true })
+  accountName: string | null;
+
+  @Column({ name: 'account_number', type: 'varchar', length: 50, nullable: true })
+  accountNumber: string | null;
+
   @Column({ name: 'session_rate', type: 'decimal', precision: 12, scale: 2 })
   sessionRate: string;
 

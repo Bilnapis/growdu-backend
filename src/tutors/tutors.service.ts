@@ -7,6 +7,7 @@ import { EntityStatus } from '../common/enums/entity-status.enum.js';
 import { UsersService } from '../users/users.service.js';
 import {
   CreateTutorDto,
+  TutorFormOptionsDto,
   TutorsQueryDto,
   UpdateTutorDto,
 } from './dto/tutor-input.dto.js';
@@ -39,6 +40,46 @@ export class TutorsService {
     return TutorResponseDto.fromEntity(await this.findEntity(tenantId, id));
   }
 
+  getFormOptions(): TutorFormOptionsDto {
+    return {
+      expertiseOptions: [
+        'Matematika',
+        'Fisika',
+        'Kimia',
+        'Biologi',
+        'Bahasa Inggris',
+        'Bahasa Indonesia',
+        'Ekonomi',
+        'Akuntansi',
+        'Komputer',
+      ],
+      educationOptions: [
+        'Pendidikan Matematika',
+        'Pendidikan Fisika',
+        'Pendidikan Kimia',
+        'Pendidikan Biologi',
+        'Pendidikan Bahasa Inggris',
+        'Teknik Informatika',
+        'Sistem Informasi',
+        'Akuntansi',
+        'Manajemen',
+      ],
+      bankOptions: [
+        'BCA',
+        'BNI',
+        'BRI',
+        'Mandiri',
+        'BSI',
+        'CIMB Niaga',
+        'Permata',
+        'DANA',
+        'GoPay',
+        'OVO',
+        'ShopeePay',
+      ],
+    };
+  }
+
   async findMe(tenantId: string, userId: string): Promise<TutorResponseDto> {
     const tutor = await this.tutorsRepository.findByUserId(userId, tenantId);
     if (!tutor) {
@@ -56,6 +97,13 @@ export class TutorsService {
       userId: null,
       name: dto.name,
       phoneNumber: dto.phoneNumber,
+      email: dto.email ?? null,
+      address: dto.address ?? null,
+      expertise: dto.expertise ?? null,
+      education: dto.education ?? null,
+      bankName: dto.bankName ?? null,
+      accountName: dto.accountName ?? null,
+      accountNumber: dto.accountNumber ?? null,
       sessionRate: this.normalizeRate(dto.sessionRate),
       status: dto.status ?? EntityStatus.Active,
     });
@@ -70,6 +118,13 @@ export class TutorsService {
     const tutor = await this.findEntity(tenantId, id);
     if (dto.name !== undefined) tutor.name = dto.name;
     if (dto.phoneNumber !== undefined) tutor.phoneNumber = dto.phoneNumber;
+    if (dto.email !== undefined) tutor.email = dto.email;
+    if (dto.address !== undefined) tutor.address = dto.address;
+    if (dto.expertise !== undefined) tutor.expertise = dto.expertise;
+    if (dto.education !== undefined) tutor.education = dto.education;
+    if (dto.bankName !== undefined) tutor.bankName = dto.bankName;
+    if (dto.accountName !== undefined) tutor.accountName = dto.accountName;
+    if (dto.accountNumber !== undefined) tutor.accountNumber = dto.accountNumber;
     if (dto.sessionRate !== undefined) {
       tutor.sessionRate = this.normalizeRate(dto.sessionRate);
     }

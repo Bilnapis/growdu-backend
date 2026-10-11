@@ -27,6 +27,7 @@ import { UserRole } from '../users/entities/user.entity.js';
 import { ProfileAccountsService } from '../users/profile-accounts.service.js';
 import {
   CreateTutorDto,
+  TutorFormOptionsDto,
   TutorsQueryDto,
   UpdateTutorDto,
 } from './dto/tutor-input.dto.js';
@@ -59,6 +60,12 @@ export class TutorsController {
     @Query() query: TutorsQueryDto,
   ): Promise<PaginatedResponse<TutorResponseDto>> {
     return this.tutorsService.findAll(user.tenantId, query);
+  }
+
+  @Get('form-options')
+  @ApiOkResponse({ type: TutorFormOptionsDto })
+  getFormOptions(): TutorFormOptionsDto {
+    return this.tutorsService.getFormOptions();
   }
 
   @Get(':id')
