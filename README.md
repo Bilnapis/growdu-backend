@@ -74,7 +74,7 @@ request langsung dari browser.
 | `SWAGGER_PATH` | Path dokumentasi Swagger | `docs` |
 | `ADMIN_ROOT_PATH` | Path AdminJS internal | `/backend-admin` |
 | `ADMIN_EMAIL` | Email untuk login AdminJS | wajib |
-| `ADMIN_PASSWORD` | Password AdminJS, minimal 12 karakter | wajib |
+| `ADMIN_PASSWORD` | Password AdminJS, minimal 5 karakter | wajib |
 | `ADMIN_COOKIE_SECRET` | Secret session AdminJS, minimal 32 karakter | wajib |
 | `DB_HOST` | Host MySQL XAMPP | `127.0.0.1` |
 | `DB_PORT` | Port MySQL | `3306` |

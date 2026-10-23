@@ -19,7 +19,7 @@ export const environmentValidationSchema = Joi.object({
     .pattern(/^\/[a-zA-Z0-9/_-]+$/)
     .default('/backend-admin'),
   ADMIN_EMAIL: Joi.string().email().required(),
-  ADMIN_PASSWORD: Joi.string().min(12).required(),
+  ADMIN_PASSWORD: Joi.string().min(5).required(),
   ADMIN_COOKIE_SECRET: Joi.string().min(32).required(),
   DB_HOST: Joi.string().hostname().required(),
   DB_PORT: Joi.number().port().default(3306),

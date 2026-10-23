@@ -5,6 +5,7 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  type Relation,
   UpdateDateColumn,
 } from 'typeorm';
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
@@ -20,7 +21,7 @@ export class TenantEntity {
 
   @ManyToOne(() => OwnerEntity, { nullable: false, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'owner_id' })
-  owner: OwnerEntity;
+  owner: Relation<OwnerEntity>;
 
   @Column({ type: 'varchar', length: 150 })
   name: string;

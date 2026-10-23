@@ -6,6 +6,7 @@ import {
   JoinColumn,
   OneToOne,
   PrimaryGeneratedColumn,
+  type Relation,
   UpdateDateColumn,
 } from 'typeorm';
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
@@ -22,7 +23,7 @@ export class OwnerEntity {
 
   @OneToOne(() => UserEntity, { nullable: false, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'user_id' })
-  user: UserEntity;
+  user: Relation<UserEntity>;
 
   @Column({ type: 'varchar', length: 150 })
   name: string;

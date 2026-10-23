@@ -26,6 +26,8 @@ const adminJsModule = import('@adminjs/nestjs').then(({ AdminModule }) =>
       return {
         adminJsOptions: {
           rootPath: config.rootPath,
+          loginPath: `${config.rootPath}/login`,
+          logoutPath: `${config.rootPath}/logout`,
           resources: [
             {
               resource: new TenantAdminResource(dataSource),
