@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import type { DataSource, EntityManager } from 'typeorm';
 import { EntityStatus } from '../common/enums/entity-status.enum.js';
 import { ParentEntity } from '../parents/entities/parent.entity.js';
+import { StudentsQueryDto } from './dto/student-input.dto.js';
 import {
   StudentParentEntity,
   ParentRelationship,
@@ -20,6 +21,63 @@ function transactionDataSource(manager: EntityManager): DataSource {
 }
 
 describe('StudentsService', () => {
+  it('loads primary parents for a page in one batch query', async () => {
+    const student = Object.assign(new StudentEntity(), {
+      id: 'student-id',
+      tenantId: 'tenant-id',
+      studentCode: 'STD-001',
+      name: 'Nadia Putri',
+      gender: 'female',
+      educationLevel: 'SMP Kelas 8',
+      school: 'SMP Negeri 2 Bandung',
+      phoneNumber: null,
+      address: 'Bandung',
+      status: EntityStatus.Active,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    const parent = Object.assign(new ParentEntity(), {
+      id: 'parent-id',
+      name: 'Budi Santoso',
+      phoneNumber: '081234567890',
+      contactEmail: 'budi@example.com',
+    });
+    const relation = Object.assign(new StudentParentEntity(), {
+      studentId: student.id,
+      parentId: parent.id,
+      parent,
+      relationship: ParentRelationship.Guardian,
+      isPrimary: true,
+      accessStatus: EntityStatus.Active,
+    });
+    const repository = {
+      findPage: vi.fn().mockResolvedValue([[student], 1]),
+      findPrimaryParentRelations: vi.fn().mockResolvedValue([relation]),
+    } as unknown as StudentsRepository;
+    const service = new StudentsService(
+      repository,
+      transactionDataSource({} as EntityManager),
+    );
+    const query = Object.assign(new StudentsQueryDto(), {
+      page: 1,
+      limit: 5,
+    });
+
+    const result = await service.findAll('tenant-id', query);
+
+    expect(repository.findPrimaryParentRelations).toHaveBeenCalledWith(
+      'tenant-id',
+      ['student-id'],
+    );
+    expect(result.data[0]).toMatchObject({
+      id: 'student-id',
+      primaryParent: {
+        parentId: 'parent-id',
+        parentName: 'Budi Santoso',
+      },
+    });
+  });
+
   it('rejects a parent from outside the authenticated tenant', async () => {
     const student = Object.assign(new StudentEntity(), {
       id: 'student-id',

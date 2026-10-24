@@ -95,3 +95,25 @@ export class StudentParentResponseDto {
     };
   }
 }
+
+export class StudentListItemResponseDto extends StudentResponseDto {
+  @ApiPropertyOptional({ type: StudentParentResponseDto, nullable: true })
+  primaryParent: StudentParentResponseDto | null;
+}
+
+export class StudentsSummaryResponseDto {
+  @ApiProperty()
+  active: number;
+
+  @ApiProperty()
+  inactive: number;
+
+  @ApiProperty()
+  missingParentContact: number;
+
+  @ApiProperty({
+    description:
+      'Active students without a group. Until the groups domain is available, every active student is counted.',
+  })
+  withoutGroup: number;
+}

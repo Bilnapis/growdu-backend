@@ -36,9 +36,14 @@ import {
   UpdateStudentParentDto,
 } from './dto/student-parent-input.dto.js';
 import {
+  StudentListItemResponseDto,
   StudentParentResponseDto,
   StudentResponseDto,
+  StudentsSummaryResponseDto,
 } from './dto/student-response.dto.js';
+import { CreateStudentRegistrationDto } from './dto/student-registration-input.dto.js';
+import { StudentRegistrationResponseDto } from './dto/student-registration-response.dto.js';
+import { StudentRegistrationService } from './student-registration.service.js';
 import { StudentsService } from './students.service.js';
 
 @ApiTags('Students')
@@ -48,15 +53,26 @@ import { StudentsService } from './students.service.js';
 @TenantScoped()
 @Controller('students')
 export class StudentsController {
-  constructor(private readonly studentsService: StudentsService) {}
+  constructor(
+    private readonly studentsService: StudentsService,
+    private readonly studentRegistrationService: StudentRegistrationService,
+  ) {}
 
   @Get()
-  @ApiPaginatedResponse(StudentResponseDto)
+  @ApiPaginatedResponse(StudentListItemResponseDto)
   findAll(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: StudentsQueryDto,
-  ): Promise<PaginatedResponse<StudentResponseDto>> {
+  ): Promise<PaginatedResponse<StudentListItemResponseDto>> {
     return this.studentsService.findAll(user.tenantId, query);
+  }
+
+  @Get('summary')
+  @ApiOkResponse({ type: StudentsSummaryResponseDto })
+  getSummary(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<StudentsSummaryResponseDto> {
+    return this.studentsService.getSummary(user.tenantId);
   }
 
   @Get(':id')
@@ -75,6 +91,16 @@ export class StudentsController {
     @Body() dto: CreateStudentDto,
   ): Promise<StudentResponseDto> {
     return this.studentsService.create(user.tenantId, dto);
+  }
+
+  @Post('registrations')
+  @Roles(UserRole.Owner)
+  @ApiCreatedResponse({ type: StudentRegistrationResponseDto })
+  createRegistration(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateStudentRegistrationDto,
+  ): Promise<StudentRegistrationResponseDto> {
+    return this.studentRegistrationService.create(user.tenantId, dto);
   }
 
   @Patch(':id')

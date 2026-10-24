@@ -14,6 +14,12 @@ import { StudentGender } from '../entities/student.entity.js';
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
+export enum EducationStage {
+  Elementary = 'SD',
+  JuniorHigh = 'SMP',
+  SeniorHigh = 'SMA',
+}
+
 export class CreateStudentDto {
   @ApiProperty({ maxLength: 30 })
   @Transform(({ value }: { value: unknown }) =>
@@ -149,4 +155,9 @@ export class StudentsQueryDto extends PaginationQueryDto {
   @IsString()
   @MaxLength(50)
   educationLevel?: string;
+
+  @ApiPropertyOptional({ enum: EducationStage })
+  @IsOptional()
+  @IsEnum(EducationStage)
+  educationStage?: EducationStage;
 }

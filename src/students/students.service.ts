@@ -21,8 +21,10 @@ import {
   UpdateStudentParentDto,
 } from './dto/student-parent-input.dto.js';
 import {
+  StudentListItemResponseDto,
   StudentParentResponseDto,
   StudentResponseDto,
+  StudentsSummaryResponseDto,
 } from './dto/student-response.dto.js';
 import { StudentParentEntity } from './entities/student-parent.entity.js';
 import { StudentEntity } from './entities/student.entity.js';
@@ -38,15 +40,35 @@ export class StudentsService {
   async findAll(
     tenantId: string,
     query: StudentsQueryDto,
-  ): Promise<PaginatedResponse<StudentResponseDto>> {
+  ): Promise<PaginatedResponse<StudentListItemResponseDto>> {
     const [students, total] = await this.studentsRepository.findPage(
       tenantId,
       query,
     );
+    const parentRelations =
+      await this.studentsRepository.findPrimaryParentRelations(
+        tenantId,
+        students.map((student) => student.id),
+      );
+    const parentByStudentId = new Map(
+      parentRelations.map((relation) => [relation.studentId, relation]),
+    );
     return {
-      data: students.map(StudentResponseDto.fromEntity),
+      data: students.map((student) => {
+        const relation = parentByStudentId.get(student.id);
+        return {
+          ...StudentResponseDto.fromEntity(student),
+          primaryParent: relation
+            ? StudentParentResponseDto.fromEntity(relation)
+            : null,
+        };
+      }),
       meta: createPaginationMeta(query.page, query.limit, total),
     };
+  }
+
+  getSummary(tenantId: string): Promise<StudentsSummaryResponseDto> {
+    return this.studentsRepository.getSummary(tenantId);
   }
 
   async findOne(tenantId: string, id: string): Promise<StudentResponseDto> {

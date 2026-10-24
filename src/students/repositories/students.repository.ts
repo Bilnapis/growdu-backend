@@ -1,9 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { StudentsQueryDto } from '../dto/student-input.dto.js';
 import { StudentParentEntity } from '../entities/student-parent.entity.js';
 import { StudentEntity } from '../entities/student.entity.js';
+
+export type StudentsSummary = {
+  active: number;
+  inactive: number;
+  missingParentContact: number;
+  withoutGroup: number;
+};
 
 @Injectable()
 export class StudentsRepository {
@@ -36,7 +43,24 @@ export class StudentsRepository {
 
     if (query.search) {
       builder.andWhere(
-        '(student.student_code LIKE :search OR student.name LIKE :search OR student.school LIKE :search)',
+        `(
+          student.student_code LIKE :search
+          OR student.name LIKE :search
+          OR student.school LIKE :search
+          OR EXISTS (
+            SELECT 1
+            FROM student_parents search_relation
+            INNER JOIN parents search_parent ON search_parent.id = search_relation.parent_id
+            WHERE search_relation.student_id = student.id
+              AND search_relation.tenant_id = :tenantId
+              AND search_parent.tenant_id = :tenantId
+              AND (
+                search_parent.name LIKE :search
+                OR search_parent.phone_number LIKE :search
+                OR search_parent.contact_email LIKE :search
+              )
+          )
+        )`,
         { search: `%${query.search}%` },
       );
     }
@@ -51,12 +75,74 @@ export class StudentsRepository {
         educationLevel: query.educationLevel,
       });
     }
+    if (query.educationStage) {
+      builder.andWhere('student.education_level LIKE :educationStage', {
+        educationStage: `${query.educationStage}%`,
+      });
+    }
 
     return builder
       .orderBy('student.created_at', 'DESC')
       .skip((query.page - 1) * query.limit)
       .take(query.limit)
       .getManyAndCount();
+  }
+
+  findPrimaryParentRelations(
+    tenantId: string,
+    studentIds: string[],
+  ): Promise<StudentParentEntity[]> {
+    if (studentIds.length === 0) return Promise.resolve([]);
+
+    return this.relationsRepository.find({
+      where: {
+        tenantId,
+        studentId: In(studentIds),
+        isPrimary: true,
+      },
+      relations: { parent: true },
+    });
+  }
+
+  async getSummary(tenantId: string): Promise<StudentsSummary> {
+    const raw = await this.repository
+      .createQueryBuilder('student')
+      .leftJoin(
+        StudentParentEntity,
+        'primary_relation',
+        'primary_relation.student_id = student.id AND primary_relation.tenant_id = student.tenant_id AND primary_relation.is_primary = true',
+      )
+      .leftJoin(
+        'parents',
+        'primary_parent',
+        'primary_parent.id = primary_relation.parent_id AND primary_parent.tenant_id = student.tenant_id',
+      )
+      .select(
+        "COUNT(DISTINCT CASE WHEN student.status = 'active' THEN student.id END)",
+        'active',
+      )
+      .addSelect(
+        "COUNT(DISTINCT CASE WHEN student.status = 'inactive' THEN student.id END)",
+        'inactive',
+      )
+      .addSelect(
+        "COUNT(DISTINCT CASE WHEN primary_parent.id IS NULL OR primary_parent.contact_email = '' THEN student.id END)",
+        'missingParentContact',
+      )
+      .where('student.tenant_id = :tenantId', { tenantId })
+      .getRawOne<{
+        active: string;
+        inactive: string;
+        missingParentContact: string;
+      }>();
+
+    const active = Number(raw?.active ?? 0);
+    return {
+      active,
+      inactive: Number(raw?.inactive ?? 0),
+      missingParentContact: Number(raw?.missingParentContact ?? 0),
+      withoutGroup: active,
+    };
   }
 
   findParentRelations(
