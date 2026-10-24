@@ -15,6 +15,7 @@ import { ParentsModule } from './parents/parents.module.js';
 import { PlatformAdminModule } from './platform-admin/platform-admin.module.js';
 import { OwnersModule } from './owners/owners.module.js';
 import { StudentsModule } from './students/students.module.js';
+import { StudyGroupsModule } from './study-groups/study-groups.module.js';
 import { TenantsModule } from './tenants/tenants.module.js';
 import { TutorsModule } from './tutors/tutors.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -53,6 +54,7 @@ import { UsersModule } from './users/users.module.js';
     TutorsModule,
     ParentsModule,
     StudentsModule,
+    StudyGroupsModule,
     PlatformAdminModule,
     AdminPanelModule,
   ],

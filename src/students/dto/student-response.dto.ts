@@ -113,7 +113,7 @@ export class StudentsSummaryResponseDto {
 
   @ApiProperty({
     description:
-      'Active students without a group. Until the groups domain is available, every active student is counted.',
+      'Active students without membership in an active study group.',
   })
   withoutGroup: number;
 }

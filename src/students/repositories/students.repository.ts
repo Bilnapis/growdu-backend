@@ -129,11 +129,16 @@ export class StudentsRepository {
         "COUNT(DISTINCT CASE WHEN primary_parent.id IS NULL OR primary_parent.contact_email = '' THEN student.id END)",
         'missingParentContact',
       )
+      .addSelect(
+        "COUNT(DISTINCT CASE WHEN student.status = 'active' AND NOT EXISTS (SELECT 1 FROM study_group_students group_student INNER JOIN study_groups study_group ON study_group.id = group_student.study_group_id AND study_group.status = 'active' WHERE group_student.tenant_id = student.tenant_id AND group_student.student_id = student.id) THEN student.id END)",
+        'withoutGroup',
+      )
       .where('student.tenant_id = :tenantId', { tenantId })
       .getRawOne<{
         active: string;
         inactive: string;
         missingParentContact: string;
+        withoutGroup: string;
       }>();
 
     const active = Number(raw?.active ?? 0);
@@ -141,7 +146,7 @@ export class StudentsRepository {
       active,
       inactive: Number(raw?.inactive ?? 0),
       missingParentContact: Number(raw?.missingParentContact ?? 0),
-      withoutGroup: active,
+      withoutGroup: Number(raw?.withoutGroup ?? 0),
     };
   }
 
