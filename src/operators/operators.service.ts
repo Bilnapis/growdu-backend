@@ -128,10 +128,18 @@ export class OperatorsService {
           operator.user.status = dto.status;
         }
         if (dto.email !== undefined) operator.user.email = dto.email;
+        if (dto.password !== undefined) {
+          operator.user.passwordHash = await this.passwordHashService.hash(
+            dto.password,
+          );
+        }
 
         const savedUser = await manager.save(operator.user);
         const savedOperator = await manager.save(operator);
-        if (dto.status === EntityStatus.Inactive) {
+        if (
+          dto.status === EntityStatus.Inactive ||
+          dto.password !== undefined
+        ) {
           await manager
             .createQueryBuilder()
             .update(AuthSessionEntity)

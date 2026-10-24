@@ -88,6 +88,13 @@ export class UpdateOperatorDto {
   @MaxLength(150)
   email?: string;
 
+  @ApiPropertyOptional({ minLength: 5, maxLength: 128, writeOnly: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(5)
+  @MaxLength(128)
+  password?: string;
+
   @ApiPropertyOptional({ enum: EntityStatus })
   @IsOptional()
   @IsEnum(EntityStatus)

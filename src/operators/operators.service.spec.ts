@@ -156,3 +156,64 @@ describe('OperatorsService create failures', () => {
     );
   });
 });
+
+describe('OperatorsService update', () => {
+  it('hashes a replacement password and revokes active sessions', async () => {
+    const ownersService = {
+      assertOwnsTenant: vi.fn().mockResolvedValue(undefined),
+    } as unknown as OwnersService;
+    const passwordHashService = {
+      hash: vi.fn().mockResolvedValue('replacement-password-hash'),
+    } as unknown as PasswordHashService;
+    const user = Object.assign(new UserEntity(), {
+      id: 'user-id',
+      tenantId: 'tenant-id',
+      email: 'operator@example.com',
+      passwordHash: 'previous-password-hash',
+      role: UserRole.Operator,
+      status: EntityStatus.Active,
+    });
+    const operator = Object.assign(new OperatorEntity(), {
+      id: 'operator-id',
+      tenantId: 'tenant-id',
+      userId: user.id,
+      name: 'Operator Test',
+      phoneNumber: '+6281234567890',
+      status: EntityStatus.Active,
+      user,
+    });
+    const sessionQuery = {
+      update: vi.fn().mockReturnThis(),
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      andWhere: vi.fn().mockReturnThis(),
+      execute: vi.fn().mockResolvedValue(undefined),
+    };
+    const manager = {
+      findOne: vi.fn().mockResolvedValue(operator),
+      save: vi.fn((entity: UserEntity | OperatorEntity) => entity),
+      createQueryBuilder: vi.fn().mockReturnValue(sessionQuery),
+    } as unknown as EntityManager;
+    const dataSource = {
+      transaction: vi.fn(
+        (work: (transactionManager: EntityManager) => Promise<unknown>) =>
+          work(manager),
+      ),
+    } as unknown as DataSource;
+    const service = new OperatorsService(
+      {} as OperatorsRepository,
+      ownersService,
+      passwordHashService,
+      dataSource,
+    );
+
+    await service.update('owner-id', 'tenant-id', 'operator-id', {
+      password: 'new-secure-password',
+    });
+
+    expect(passwordHashService.hash).toHaveBeenCalledWith('new-secure-password');
+    expect(user.passwordHash).toBe('replacement-password-hash');
+    expect(sessionQuery.update).toHaveBeenCalled();
+    expect(sessionQuery.execute).toHaveBeenCalled();
+  });
+});
