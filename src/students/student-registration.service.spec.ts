@@ -6,6 +6,7 @@ import { UserEntity, UserRole } from '../users/entities/user.entity.js';
 import {
   StudentParentSource,
   type CreateStudentRegistrationDto,
+  type UpdateStudentRegistrationDto,
 } from './dto/student-registration-input.dto.js';
 import { StudentParentEntity } from './entities/student-parent.entity.js';
 import { StudentEntity, StudentGender } from './entities/student.entity.js';
@@ -85,6 +86,83 @@ describe('StudentRegistrationService', () => {
       parentId: 'parent-id',
       isPrimary: true,
     });
+    expect(result).toMatchObject({
+      parentId: 'parent-id',
+      student: { id: 'student-id', name: 'Nadia Putri' },
+    });
+  });
+
+  it('updates the student, primary parent, and parent login email atomically', async () => {
+    const student = Object.assign(new StudentEntity(), {
+      id: 'student-id',
+      tenantId: 'tenant-id',
+      studentCode: 'STD-001',
+      name: 'Old Student',
+      gender: StudentGender.Female,
+      educationLevel: 'SMP Kelas 8',
+      school: 'Old School',
+      phoneNumber: null,
+      address: 'Old Address',
+      status: EntityStatus.Active,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    const relation = Object.assign(new StudentParentEntity(), {
+      studentId: student.id,
+      parentId: 'parent-id',
+      tenantId: 'tenant-id',
+      isPrimary: true,
+    });
+    const parent = Object.assign(new ParentEntity(), {
+      id: 'parent-id',
+      tenantId: 'tenant-id',
+      userId: 'user-id',
+      name: 'Old Parent',
+      phoneNumber: '+628111111111',
+      contactEmail: 'old@example.com',
+    });
+    const user = Object.assign(new UserEntity(), {
+      id: 'user-id',
+      tenantId: 'tenant-id',
+      email: 'old@example.com',
+    });
+    const manager = {
+      findOne: vi
+        .fn()
+        .mockResolvedValueOnce(student)
+        .mockResolvedValueOnce(relation)
+        .mockResolvedValueOnce(parent)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(user),
+      save: vi.fn(async (entity: ObjectLiteral) => entity),
+    } as unknown as EntityManager;
+    const service = new StudentRegistrationService(
+      transactionDataSource(manager),
+      {} as PasswordHashService,
+    );
+    const dto: UpdateStudentRegistrationDto = {
+      name: 'Nadia Putri',
+      school: 'SMP Negeri 2 Bandung',
+      parent: {
+        name: 'Budi Santoso',
+        phoneNumber: '+6281234567890',
+        email: 'budi@example.com',
+      },
+    };
+
+    const result = await service.update('tenant-id', student.id, dto);
+
+    expect(student).toMatchObject({
+      name: 'Nadia Putri',
+      school: 'SMP Negeri 2 Bandung',
+    });
+    expect(parent).toMatchObject({
+      name: 'Budi Santoso',
+      phoneNumber: '+6281234567890',
+      contactEmail: 'budi@example.com',
+    });
+    expect(user.email).toBe('budi@example.com');
+    expect(manager.save).toHaveBeenCalledWith(user);
     expect(result).toMatchObject({
       parentId: 'parent-id',
       student: { id: 'student-id', name: 'Nadia Putri' },

@@ -41,7 +41,10 @@ import {
   StudentResponseDto,
   StudentsSummaryResponseDto,
 } from './dto/student-response.dto.js';
-import { CreateStudentRegistrationDto } from './dto/student-registration-input.dto.js';
+import {
+  CreateStudentRegistrationDto,
+  UpdateStudentRegistrationDto,
+} from './dto/student-registration-input.dto.js';
 import { StudentRegistrationResponseDto } from './dto/student-registration-response.dto.js';
 import { StudentRegistrationService } from './student-registration.service.js';
 import { StudentsService } from './students.service.js';
@@ -101,6 +104,17 @@ export class StudentsController {
     @Body() dto: CreateStudentRegistrationDto,
   ): Promise<StudentRegistrationResponseDto> {
     return this.studentRegistrationService.create(user.tenantId, dto);
+  }
+
+  @Patch(':id/registration')
+  @Roles(UserRole.Owner)
+  @ApiOkResponse({ type: StudentRegistrationResponseDto })
+  updateRegistration(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateStudentRegistrationDto,
+  ): Promise<StudentRegistrationResponseDto> {
+    return this.studentRegistrationService.update(user.tenantId, id, dto);
   }
 
   @Patch(':id')

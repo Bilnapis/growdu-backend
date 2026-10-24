@@ -15,6 +15,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
 import { ParentRelationship } from '../entities/student-parent.entity.js';
 import { StudentGender } from '../entities/student.entity.js';
+import { UpdateStudentDto } from './student-input.dto.js';
 
 export enum StudentParentSource {
   New = 'new',
@@ -130,4 +131,34 @@ export class CreateStudentRegistrationDto {
   @IsOptional()
   @IsEnum(ParentRelationship)
   relationship?: ParentRelationship;
+}
+
+export class UpdateRegisteredParentDto {
+  @ApiProperty({ minLength: 2, maxLength: 150 })
+  @Transform(trim)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(150)
+  name: string;
+
+  @ApiProperty({ minLength: 6, maxLength: 20 })
+  @Transform(trim)
+  @IsString()
+  @MinLength(6)
+  @MaxLength(20)
+  phoneNumber: string;
+
+  @ApiProperty({ format: 'email', maxLength: 150 })
+  @Transform(normalizeEmail)
+  @IsEmail()
+  @MaxLength(150)
+  email: string;
+}
+
+export class UpdateStudentRegistrationDto extends UpdateStudentDto {
+  @ApiProperty({ type: UpdateRegisteredParentDto })
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => UpdateRegisteredParentDto)
+  parent: UpdateRegisteredParentDto;
 }

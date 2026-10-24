@@ -13,6 +13,7 @@ import { UserEntity, UserRole } from '../users/entities/user.entity.js';
 import {
   CreateStudentRegistrationDto,
   StudentParentSource,
+  UpdateStudentRegistrationDto,
 } from './dto/student-registration-input.dto.js';
 import { StudentRegistrationResponseDto } from './dto/student-registration-response.dto.js';
 import { StudentResponseDto } from './dto/student-response.dto.js';
@@ -124,6 +125,70 @@ export class StudentRegistrationService {
         throw new ConflictException(
           'Student code, parent profile, or email already exists',
         );
+      }
+      throw error;
+    }
+  }
+
+  async update(
+    tenantId: string,
+    studentId: string,
+    dto: UpdateStudentRegistrationDto,
+  ): Promise<StudentRegistrationResponseDto> {
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const student = await manager.findOne(StudentEntity, {
+          where: { id: studentId, tenantId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!student) throw new NotFoundException('Student not found');
+
+        const relation = await manager.findOne(StudentParentEntity, {
+          where: { studentId, tenantId, isPrimary: true },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!relation) {
+          throw new NotFoundException('Primary parent not found');
+        }
+
+        const parent = await manager.findOne(ParentEntity, {
+          where: { id: relation.parentId, tenantId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!parent) throw new NotFoundException('Parent not found');
+
+        const { parent: parentInput, ...studentInput } = dto;
+        Object.assign(student, studentInput);
+        parent.name = parentInput.name;
+        parent.phoneNumber = parentInput.phoneNumber;
+        parent.contactEmail = parentInput.email;
+
+        if (parent.userId) {
+          const conflictingUser = await manager.findOne(UserEntity, {
+            where: { email: parentInput.email },
+          });
+          if (conflictingUser && conflictingUser.id !== parent.userId) {
+            throw new ConflictException('Email is already registered');
+          }
+          const user = await manager.findOne(UserEntity, {
+            where: { id: parent.userId, tenantId },
+            lock: { mode: 'pessimistic_write' },
+          });
+          if (!user) throw new NotFoundException('Parent account not found');
+          user.email = parentInput.email;
+          await manager.save(user);
+        }
+
+        const savedStudent = await manager.save(student);
+        const savedParent = await manager.save(parent);
+        return {
+          student: StudentResponseDto.fromEntity(savedStudent),
+          parentId: savedParent.id,
+        };
+      });
+    } catch (error: unknown) {
+      if (isDuplicateEntryError(error)) {
+        throw new ConflictException('Email is already registered');
       }
       throw error;
     }
