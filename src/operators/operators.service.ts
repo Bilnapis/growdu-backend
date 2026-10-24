@@ -86,6 +86,7 @@ export class OperatorsService {
           tenantId,
           userId: savedUser.id,
           name: dto.name,
+          address: dto.address?.trim() || null,
           phoneNumber: dto.phoneNumber,
           status,
         });
@@ -118,6 +119,8 @@ export class OperatorsService {
         if (!operator) throw new NotFoundException('Operator not found');
 
         if (dto.name !== undefined) operator.name = dto.name;
+        if (dto.address !== undefined)
+          operator.address = dto.address?.trim() || null;
         if (dto.phoneNumber !== undefined)
           operator.phoneNumber = dto.phoneNumber;
         if (dto.status !== undefined) {

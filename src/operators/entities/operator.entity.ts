@@ -40,6 +40,9 @@ export class OperatorEntity {
   @Column({ name: 'phone_number', type: 'varchar', length: 20 })
   phoneNumber: string;
 
+  @Column({ type: 'varchar', length: 1000, nullable: true })
+  address: string | null;
+
   @Column({ type: 'enum', enum: EntityStatus, default: EntityStatus.Active })
   status: EntityStatus;
 

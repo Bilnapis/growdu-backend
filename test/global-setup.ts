@@ -2,6 +2,11 @@ import 'dotenv/config';
 import mysql from 'mysql2/promise';
 import { DataSource } from 'typeorm';
 import { CreateCoreIdentitySchema20260926000000 } from '../src/database/migrations/20260926000000-CreateCoreIdentitySchema.js';
+import { AddOwnerAndAdminProfiles20260929000000 } from '../src/database/migrations/20260929000000-AddOwnerAndAdminProfiles.js';
+import { RenameAdminsToOperators20260930000000 } from '../src/database/migrations/20260930000000-RenameAdminsToOperators.js';
+import { CreatePlatformAdmins20261003000000 } from '../src/database/migrations/20261003000000-CreatePlatformAdmins.js';
+import { AddTutorProfileDetails20261004000000 } from '../src/database/migrations/20261004000000-AddTutorProfileDetails.js';
+import { AddOperatorAddress20261024000000 } from '../src/database/migrations/20261024000000-AddOperatorAddress.js';
 
 const databaseNamePattern = /^growdu_e2e_\d+_\d+$/;
 
@@ -34,7 +39,14 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD ?? '',
       database: databaseName,
-      migrations: [CreateCoreIdentitySchema20260926000000],
+      migrations: [
+        CreateCoreIdentitySchema20260926000000,
+        AddOwnerAndAdminProfiles20260929000000,
+        RenameAdminsToOperators20260930000000,
+        CreatePlatformAdmins20261003000000,
+        AddTutorProfileDetails20261004000000,
+        AddOperatorAddress20261024000000,
+      ],
       synchronize: false,
       migrationsRun: false,
     });

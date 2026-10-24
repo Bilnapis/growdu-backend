@@ -180,3 +180,20 @@ npm run migration:show
 membuat database disposable berawalan `growdu_e2e_`, menjalankan migration dan
 skenario API, lalu menghapusnya pada teardown. Database pada `DB_NAME` tidak
 diubah oleh suite E2E.
+
+### Integrasi pegawai
+
+Halaman `/staff` menggunakan resource operator milik bimbel:
+`GET /api/v1/tenants/:tenantId/operators` untuk daftar (pencarian, status,
+dan pagination) serta `POST /api/v1/tenants/:tenantId/operators` untuk pembuatan.
+Hanya owner bimbel terkait yang boleh mengakses endpoint ini.
+
+Body pembuatan berisi `name` (2–150 karakter), `phoneNumber` (6–20 karakter),
+`email` (maksimal 150 karakter), `password` (5–128 karakter), serta `address`
+opsional (maksimal 1000 karakter). Akun login dan profil operator dibuat dalam
+satu transaksi. Password hanya disimpan sebagai hash dan tidak dikembalikan.
+
+Jalankan `npm run migration:run` untuk menerapkan migration
+`20261024000000-AddOperatorAddress` sebelum memakai form pegawai. Kolom alamat
+bersifat nullable sehingga data lama tetap valid. Rollback migration menghapus
+kolom alamat beserta isinya. Hak akses per menu belum menjadi bagian fitur ini.

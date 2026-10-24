@@ -18,6 +18,9 @@ export class OperatorResponseDto {
   @ApiProperty()
   phoneNumber: string;
 
+  @ApiProperty({ nullable: true, maxLength: 1000 })
+  address: string | null;
+
   @ApiProperty({ format: 'email' })
   email: string;
 
@@ -36,6 +39,7 @@ export class OperatorResponseDto {
       tenantId: entity.tenantId,
       userId: entity.userId,
       name: entity.name,
+      address: entity.address ?? null,
       phoneNumber: entity.phoneNumber,
       email: entity.user.email,
       status: entity.status,

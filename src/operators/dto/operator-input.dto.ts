@@ -18,6 +18,13 @@ const normalizeEmail = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().toLowerCase() : value;
 
 export class CreateOperatorDto {
+  @ApiPropertyOptional({ maxLength: 1000 })
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(1000)
+  address?: string;
+
   @ApiProperty({ minLength: 2, maxLength: 150 })
   @Transform(trim)
   @IsString()
@@ -38,9 +45,9 @@ export class CreateOperatorDto {
   @MaxLength(150)
   email: string;
 
-  @ApiProperty({ minLength: 12, maxLength: 128, writeOnly: true })
+  @ApiProperty({ minLength: 5, maxLength: 128, writeOnly: true })
   @IsString()
-  @MinLength(12)
+  @MinLength(5)
   @MaxLength(128)
   password: string;
 
@@ -51,6 +58,13 @@ export class CreateOperatorDto {
 }
 
 export class UpdateOperatorDto {
+  @ApiPropertyOptional({ maxLength: 1000 })
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(1000)
+  address?: string;
+
   @ApiPropertyOptional({ minLength: 2, maxLength: 150 })
   @IsOptional()
   @Transform(trim)
