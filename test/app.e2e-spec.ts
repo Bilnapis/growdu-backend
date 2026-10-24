@@ -8,6 +8,8 @@ import { AppModule } from './../src/app.module.js';
 import { configureApplication } from './../src/app.setup.js';
 import { AuthSessionEntity } from './../src/auth/entities/auth-session.entity.js';
 import { EntityStatus } from './../src/common/enums/entity-status.enum.js';
+import { OperatorEntity } from './../src/operators/entities/operator.entity.js';
+import { OwnerEntity } from './../src/owners/entities/owner.entity.js';
 import { PasswordHashService } from './../src/common/security/password-hash.service.js';
 import { ParentEntity } from './../src/parents/entities/parent.entity.js';
 import {
@@ -39,6 +41,7 @@ interface SeedIds {
 
 const password = 'StrongPassword!123';
 const changedPassword = 'ChangedPassword!456';
+const adminRootPath = process.env.ADMIN_ROOT_PATH ?? '/backend-admin';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -77,8 +80,27 @@ describe('AppController (e2e)', () => {
     const passwordHash = await passwordHashService.hash(password);
 
     ids = await dataSource.transaction(async (manager) => {
+      const ownerUser = await manager.save(
+        manager.create(UserEntity, {
+          tenantId: null,
+          email: 'owner@example.com',
+          passwordHash,
+          role: UserRole.Owner,
+          status: EntityStatus.Active,
+          lastLoginAt: null,
+        }),
+      );
+      const owner = await manager.save(
+        manager.create(OwnerEntity, {
+          userId: ownerUser.id,
+          name: 'Owner E2E',
+          phoneNumber: '081200000000',
+          status: EntityStatus.Active,
+        }),
+      );
       const tenant = await manager.save(
         manager.create(TenantEntity, {
+          ownerId: owner.id,
           name: 'GrowDu E2E',
           address: null,
           whatsappNumber: null,
@@ -89,6 +111,7 @@ describe('AppController (e2e)', () => {
       );
       const otherTenant = await manager.save(
         manager.create(TenantEntity, {
+          ownerId: owner.id,
           name: 'Other Tenant',
           address: null,
           whatsappNumber: null,
@@ -107,13 +130,30 @@ describe('AppController (e2e)', () => {
           status: EntityStatus.Active,
           lastLoginAt: null,
         });
-      const owner = await manager.save(
-        createUser('owner@example.com', UserRole.Owner),
+      const operatorUser = await manager.save(
+        createUser('admin@example.com', UserRole.Operator),
       );
-      await manager.save(createUser('admin@example.com', UserRole.Admin));
-      await manager.save(
-        createUser('password-admin@example.com', UserRole.Admin),
+      const passwordOperatorUser = await manager.save(
+        createUser('password-admin@example.com', UserRole.Operator),
       );
+      await manager.save([
+        manager.create(OperatorEntity, {
+          tenantId: tenant.id,
+          userId: operatorUser.id,
+          name: 'Operator E2E',
+          phoneNumber: '081200000004',
+          address: null,
+          status: EntityStatus.Active,
+        }),
+        manager.create(OperatorEntity, {
+          tenantId: tenant.id,
+          userId: passwordOperatorUser.id,
+          name: 'Password Operator E2E',
+          phoneNumber: '081200000005',
+          address: null,
+          status: EntityStatus.Active,
+        }),
+      ]);
       const tutorUser = await manager.save(
         createUser('tutor@example.com', UserRole.Tutor),
       );
@@ -214,7 +254,7 @@ describe('AppController (e2e)', () => {
 
       return {
         tenantId: tenant.id,
-        ownerId: owner.id,
+        ownerId: ownerUser.id,
         tutorId: tutor.id,
         parentId: parent.id,
         studentId: student.id,
@@ -225,7 +265,7 @@ describe('AppController (e2e)', () => {
 
     const accounts: Array<[UserRole, string]> = [
       [UserRole.Owner, 'owner@example.com'],
-      [UserRole.Admin, 'admin@example.com'],
+      [UserRole.Operator, 'admin@example.com'],
       [UserRole.Tutor, 'tutor@example.com'],
       [UserRole.Parent, 'parent@example.com'],
     ];
@@ -249,16 +289,16 @@ describe('AppController (e2e)', () => {
       .expect({ service: 'growdu-backend', status: 'ok' });
   });
 
-  it('/admin (GET)', () => {
+  it('redirects the AdminJS root to its login page', () => {
     return request(app.getHttpServer())
-      .get('/admin')
+      .get(adminRootPath)
       .expect(302)
-      .expect('Location', '/admin/login');
+      .expect('Location', `${adminRootPath}/login`);
   });
 
-  it('/admin/login (GET)', () => {
+  it('serves the AdminJS login page', () => {
     return request(app.getHttpServer())
-      .get('/admin/login')
+      .get(`${adminRootPath}/login`)
       .expect(200)
       .expect(/Growdu Admin/);
   });
@@ -298,10 +338,10 @@ describe('AppController (e2e)', () => {
       .expect(403);
   });
 
-  it('logs in owner, admin, tutor, and parent accounts', () => {
+  it('logs in owner, operator, tutor, and parent accounts', () => {
     expect([...sessions.values()].map((session) => session.role)).toEqual([
       UserRole.Owner,
-      UserRole.Admin,
+      UserRole.Operator,
       UserRole.Tutor,
       UserRole.Parent,
     ]);
@@ -367,25 +407,26 @@ describe('AppController (e2e)', () => {
       .expect(401);
   });
 
-  it('enforces the owner/admin/tutor/parent access matrix', async () => {
+  it('enforces the owner/operator/tutor/parent access matrix', async () => {
     const owner = sessions.get(UserRole.Owner);
-    const admin = sessions.get(UserRole.Admin);
+    const operator = sessions.get(UserRole.Operator);
     const tutor = sessions.get(UserRole.Tutor);
     const parent = sessions.get(UserRole.Parent);
-    if (!owner || !admin || !tutor || !parent)
+    if (!owner || !operator || !tutor || !parent)
       throw new Error('Missing session');
 
     await request(app.getHttpServer())
       .get('/api/v1/users')
       .set('Authorization', `Bearer ${owner.accessToken}`)
+      .set('X-Tenant-Id', ids.tenantId)
       .expect(200);
     await request(app.getHttpServer())
       .get('/api/v1/users')
-      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .set('Authorization', `Bearer ${operator.accessToken}`)
       .expect(403);
     await request(app.getHttpServer())
       .get('/api/v1/tutors')
-      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .set('Authorization', `Bearer ${operator.accessToken}`)
       .expect(200);
     await request(app.getHttpServer())
       .get('/api/v1/tutors/me')
@@ -413,6 +454,7 @@ describe('AppController (e2e)', () => {
     await request(app.getHttpServer())
       .get(`/api/v1/students/${ids.otherTenantStudentId}`)
       .set('Authorization', `Bearer ${owner.accessToken}`)
+      .set('X-Tenant-Id', ids.tenantId)
       .expect(404);
   });
 
@@ -423,6 +465,7 @@ describe('AppController (e2e)', () => {
     await request(app.getHttpServer())
       .post('/api/v1/students')
       .set('Authorization', `Bearer ${owner.accessToken}`)
+      .set('X-Tenant-Id', ids.tenantId)
       .send({
         studentCode: 'STUD-001',
         name: 'Duplicate Student',
@@ -441,6 +484,7 @@ describe('AppController (e2e)', () => {
     await request(app.getHttpServer())
       .post(`/api/v1/students/${ids.studentId}/parents`)
       .set('Authorization', `Bearer ${owner.accessToken}`)
+      .set('X-Tenant-Id', ids.tenantId)
       .send({
         parentId: ids.secondaryParentId,
         relationship: ParentRelationship.Father,
@@ -452,6 +496,7 @@ describe('AppController (e2e)', () => {
     await request(app.getHttpServer())
       .get(`/api/v1/students/${ids.studentId}/parents`)
       .set('Authorization', `Bearer ${owner.accessToken}`)
+      .set('X-Tenant-Id', ids.tenantId)
       .expect(200)
       .expect(({ body }) => {
         expect(body).toHaveLength(2);
@@ -465,6 +510,7 @@ describe('AppController (e2e)', () => {
         `/api/v1/students/${ids.studentId}/parents/${ids.secondaryParentId}`,
       )
       .set('Authorization', `Bearer ${owner.accessToken}`)
+      .set('X-Tenant-Id', ids.tenantId)
       .expect(204);
   });
 

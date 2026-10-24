@@ -7,6 +7,8 @@ import { RenameAdminsToOperators20260930000000 } from '../src/database/migration
 import { CreatePlatformAdmins20261003000000 } from '../src/database/migrations/20261003000000-CreatePlatformAdmins.js';
 import { AddTutorProfileDetails20261004000000 } from '../src/database/migrations/20261004000000-AddTutorProfileDetails.js';
 import { AddOperatorAddress20261024000000 } from '../src/database/migrations/20261024000000-AddOperatorAddress.js';
+import { CreateStudyGroups20261025000000 } from '../src/database/migrations/20261025000000-CreateStudyGroups.js';
+import { CreateRoomsAndAssignSchedules20261026000000 } from '../src/database/migrations/20261026000000-CreateRoomsAndAssignSchedules.js';
 
 const databaseNamePattern = /^growdu_e2e_\d+_\d+$/;
 
@@ -46,6 +48,8 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
         CreatePlatformAdmins20261003000000,
         AddTutorProfileDetails20261004000000,
         AddOperatorAddress20261024000000,
+        CreateStudyGroups20261025000000,
+        CreateRoomsAndAssignSchedules20261026000000,
       ],
       synchronize: false,
       migrationsRun: false,
