@@ -16,6 +16,9 @@ import { EntityStatus } from '../../common/enums/entity-status.enum.js';
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
+const normalizeEmail = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.trim().toLowerCase() : value;
+
 export class CreateTutorDto {
   @ApiProperty({ minLength: 2, maxLength: 150 })
   @Transform(trim)
@@ -31,12 +34,17 @@ export class CreateTutorDto {
   @MaxLength(20)
   phoneNumber: string;
 
-  @ApiPropertyOptional({ maxLength: 150 })
-  @IsOptional()
-  @Transform(trim)
+  @ApiProperty({ format: 'email', maxLength: 150 })
+  @Transform(normalizeEmail)
   @IsEmail()
   @MaxLength(150)
-  email?: string;
+  email: string;
+
+  @ApiProperty({ minLength: 5, maxLength: 128, writeOnly: true })
+  @IsString()
+  @MinLength(5)
+  @MaxLength(128)
+  password: string;
 
   @ApiPropertyOptional({ maxLength: 5_000 })
   @IsOptional()
@@ -118,10 +126,17 @@ export class UpdateTutorDto {
 
   @ApiPropertyOptional({ maxLength: 150 })
   @IsOptional()
-  @Transform(trim)
+  @Transform(normalizeEmail)
   @IsEmail()
   @MaxLength(150)
   email?: string;
+
+  @ApiPropertyOptional({ minLength: 5, maxLength: 128, writeOnly: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(5)
+  @MaxLength(128)
+  password?: string;
 
   @ApiPropertyOptional({ maxLength: 5_000 })
   @IsOptional()
