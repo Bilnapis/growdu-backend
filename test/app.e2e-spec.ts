@@ -590,6 +590,8 @@ describe('AppController (e2e)', () => {
       .auth(tutor.accessToken, { type: 'bearer' })
       .expect(200);
     expect(detail.body.students).toHaveLength(1);
+    expect(detail.body.tutorPhoneNumber).toBeTruthy();
+    expect(detail.body.roomCapacity).toBeNull();
     const snapshotName = detail.body.students[0].name as string;
     await dataSource.manager.update(StudentEntity, ids.studentId, {
       name: 'Master renamed after snapshot',

@@ -142,8 +142,10 @@ export class ClassSessionsService {
       startTime: s.startTime.slice(0, 5),
       endTime: s.endTime.slice(0, 5),
       tutorName: tutor?.name ?? '',
+      tutorPhoneNumber: tutor?.phoneNumber ?? '',
       roomName: room?.name ?? null,
       roomCode: room?.code ?? null,
+      roomCapacity: room?.capacity ?? null,
       dayOfWeek: new Date(s.sessionDate + 'T00:00:00Z').getUTCDay() || 7,
       studentCount: students.length,
       attendanceStatus:

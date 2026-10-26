@@ -40,6 +40,10 @@ export class SessionListItemResponseDto {
   @ApiProperty({ type: Number }) version: number;
 }
 export class SessionResponseDto extends SessionListItemResponseDto {
+  @ApiProperty({ type: String })
+  tutorPhoneNumber: string;
+  @ApiProperty({ type: Number, nullable: true })
+  roomCapacity: number | null;
   @ApiProperty({ type: [SessionStudentResponseDto] })
   students: SessionStudentResponseDto[];
 }
