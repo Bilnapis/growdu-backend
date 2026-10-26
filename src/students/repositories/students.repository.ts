@@ -130,7 +130,7 @@ export class StudentsRepository {
         'missingParentContact',
       )
       .addSelect(
-        "COUNT(DISTINCT CASE WHEN student.status = 'active' AND NOT EXISTS (SELECT 1 FROM study_group_students group_student INNER JOIN study_groups study_group ON study_group.id = group_student.study_group_id AND study_group.status = 'active' WHERE group_student.tenant_id = student.tenant_id AND group_student.student_id = student.id) THEN student.id END)",
+        "COUNT(DISTINCT CASE WHEN student.status = 'active' AND NOT EXISTS (SELECT 1 FROM study_group_students group_student INNER JOIN study_groups study_group ON study_group.id = group_student.study_group_id AND study_group.status = 'active' WHERE group_student.tenant_id = student.tenant_id AND group_student.student_id = student.id AND group_student.configuration_id = (SELECT c.id FROM study_group_configurations c WHERE c.study_group_id=study_group.id AND c.superseded_at IS NULL ORDER BY c.effective_from DESC,c.created_at DESC LIMIT 1)) THEN student.id END)",
         'withoutGroup',
       )
       .where('student.tenant_id = :tenantId', { tenantId })

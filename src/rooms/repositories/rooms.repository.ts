@@ -1,3 +1,5 @@
+import { jakartaDate } from '../../class-sessions/session-dates.js';
+import { ClassSessionEntity } from '../../class-sessions/entities/class-session.entity.js';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
@@ -45,7 +47,7 @@ export class RoomsRepository {
   async findPage(
     tenantId: string,
     query: RoomsQueryDto,
-    today: number,
+    _today: number,
   ): Promise<[RoomListItemResponseDto[], number]> {
     const totalQuery = this.applyFilters(
       this.repository
@@ -59,7 +61,7 @@ export class RoomsRepository {
         .leftJoin(
           'study_group_schedules',
           'schedule',
-          'schedule.room_id = room.id AND schedule.tenant_id = room.tenant_id',
+          'schedule.room_id = room.id AND schedule.tenant_id = room.tenant_id AND (schedule.configuration_id IS NULL OR schedule.configuration_id = (SELECT c.id FROM study_group_configurations c WHERE c.study_group_id=schedule.study_group_id AND c.superseded_at IS NULL ORDER BY c.effective_from DESC,c.created_at DESC LIMIT 1))',
         )
         .leftJoin(
           'study_groups',
@@ -70,7 +72,7 @@ export class RoomsRepository {
         .leftJoin(
           'study_group_students',
           'member',
-          'member.study_group_id = study_group.id AND member.tenant_id = room.tenant_id',
+          'member.configuration_id = schedule.configuration_id AND member.tenant_id = room.tenant_id',
         )
         .where('room.tenant_id = :tenantId', { tenantId })
         .select('room.id', 'room_id')
@@ -81,24 +83,25 @@ export class RoomsRepository {
         .addSelect('COUNT(DISTINCT study_group.id)', 'active_group_count')
         .addSelect('COUNT(DISTINCT member.student_id)', 'active_student_count')
         .addSelect(
-          'COUNT(DISTINCT CASE WHEN schedule.day_of_week = :today AND study_group.id IS NOT NULL THEN schedule.id END)',
+          "(SELECT COUNT(*) FROM class_sessions cs WHERE cs.tenant_id=room.tenant_id AND cs.room_id=room.id AND cs.session_date=:today AND cs.status<>'cancelled')",
           'today_session_count',
         )
         .addSelect(
-          'MIN(CASE WHEN schedule.day_of_week = :today AND study_group.id IS NOT NULL THEN schedule.start_time END)',
+          "(SELECT MIN(cs.start_time) FROM class_sessions cs WHERE cs.tenant_id=room.tenant_id AND cs.room_id=room.id AND cs.session_date=:today AND cs.status<>'cancelled')",
           'today_start_time',
         )
         .addSelect(
-          'MAX(CASE WHEN schedule.day_of_week = :today AND study_group.id IS NOT NULL THEN schedule.end_time END)',
+          "(SELECT MAX(cs.end_time) FROM class_sessions cs WHERE cs.tenant_id=room.tenant_id AND cs.room_id=room.id AND cs.session_date=:today AND cs.status<>'cancelled')",
           'today_end_time',
         )
-        .setParameter('today', today),
+        .setParameter('today', jakartaDate()),
       query,
     );
 
     const [rows, total] = await Promise.all([
       dataQuery
         .groupBy('room.id')
+        .addGroupBy('room.tenant_id')
         .addGroupBy('room.name')
         .addGroupBy('room.code')
         .addGroupBy('room.capacity')
@@ -115,7 +118,7 @@ export class RoomsRepository {
 
   async getSummary(
     tenantId: string,
-    today: number,
+    _today: number,
   ): Promise<RoomsSummaryResponseDto> {
     const [roomRaw, sessionsToday] = await Promise.all([
       this.repository
@@ -139,24 +142,12 @@ export class RoomsRepository {
           inactive_rooms: string | null;
         }>(),
       this.repository.manager
-        .createQueryBuilder()
-        .from('study_group_schedules', 'schedule')
-        .innerJoin(
-          'rooms',
-          'room',
-          'room.id = schedule.room_id AND room.tenant_id = schedule.tenant_id',
+        .getRepository(ClassSessionEntity)
+        .createQueryBuilder('session')
+        .where(
+          "session.tenant_id=:tenantId AND session.session_date=:today AND session.room_id IS NOT NULL AND session.status<>'cancelled'",
+          { tenantId, today: jakartaDate() },
         )
-        .innerJoin(
-          'study_groups',
-          'study_group',
-          'study_group.id = schedule.study_group_id AND study_group.tenant_id = schedule.tenant_id',
-        )
-        .where('schedule.tenant_id = :tenantId', { tenantId })
-        .andWhere('schedule.day_of_week = :today', { today })
-        .andWhere('room.status = :active', { active: EntityStatus.Active })
-        .andWhere('study_group.status = :active', {
-          active: EntityStatus.Active,
-        })
         .getCount(),
     ]);
 
@@ -171,14 +162,14 @@ export class RoomsRepository {
   async findListItem(
     tenantId: string,
     roomId: string,
-    today: number,
+    _today: number,
   ): Promise<RoomListItemResponseDto | null> {
     const row = await this.repository
       .createQueryBuilder('room')
       .leftJoin(
         'study_group_schedules',
         'schedule',
-        'schedule.room_id = room.id AND schedule.tenant_id = room.tenant_id',
+        'schedule.room_id = room.id AND schedule.tenant_id = room.tenant_id AND (schedule.configuration_id IS NULL OR schedule.configuration_id = (SELECT c.id FROM study_group_configurations c WHERE c.study_group_id=schedule.study_group_id AND c.superseded_at IS NULL ORDER BY c.effective_from DESC,c.created_at DESC LIMIT 1))',
       )
       .leftJoin(
         'study_groups',
@@ -189,7 +180,7 @@ export class RoomsRepository {
       .leftJoin(
         'study_group_students',
         'member',
-        'member.study_group_id = study_group.id AND member.tenant_id = room.tenant_id',
+        'member.configuration_id = schedule.configuration_id AND member.tenant_id = room.tenant_id',
       )
       .where('room.tenant_id = :tenantId AND room.id = :roomId', {
         tenantId,
@@ -203,19 +194,20 @@ export class RoomsRepository {
       .addSelect('COUNT(DISTINCT study_group.id)', 'active_group_count')
       .addSelect('COUNT(DISTINCT member.student_id)', 'active_student_count')
       .addSelect(
-        'COUNT(DISTINCT CASE WHEN schedule.day_of_week = :today AND study_group.id IS NOT NULL THEN schedule.id END)',
+        "(SELECT COUNT(*) FROM class_sessions cs WHERE cs.tenant_id=room.tenant_id AND cs.room_id=room.id AND cs.session_date=:today AND cs.status<>'cancelled')",
         'today_session_count',
       )
       .addSelect(
-        'MIN(CASE WHEN schedule.day_of_week = :today AND study_group.id IS NOT NULL THEN schedule.start_time END)',
+        "(SELECT MIN(cs.start_time) FROM class_sessions cs WHERE cs.tenant_id=room.tenant_id AND cs.room_id=room.id AND cs.session_date=:today AND cs.status<>'cancelled')",
         'today_start_time',
       )
       .addSelect(
-        'MAX(CASE WHEN schedule.day_of_week = :today AND study_group.id IS NOT NULL THEN schedule.end_time END)',
+        "(SELECT MAX(cs.end_time) FROM class_sessions cs WHERE cs.tenant_id=room.tenant_id AND cs.room_id=room.id AND cs.session_date=:today AND cs.status<>'cancelled')",
         'today_end_time',
       )
-      .setParameter('today', today)
+      .setParameter('today', jakartaDate())
       .groupBy('room.id')
+      .addGroupBy('room.tenant_id')
       .addGroupBy('room.name')
       .addGroupBy('room.code')
       .addGroupBy('room.capacity')
@@ -253,7 +245,7 @@ export class RoomsRepository {
       .leftJoin(
         'study_group_students',
         'member',
-        'member.study_group_id = study_group.id AND member.tenant_id = schedule.tenant_id',
+        'member.configuration_id = schedule.configuration_id AND member.tenant_id = schedule.tenant_id',
       )
       .select('study_group.id', 'group_id')
       .addSelect('study_group.name', 'group_name')
@@ -270,6 +262,9 @@ export class RoomsRepository {
       .andWhere('study_group.status = :active', {
         active: EntityStatus.Active,
       })
+      .andWhere(
+        '(schedule.configuration_id IS NULL OR schedule.configuration_id = (SELECT c.id FROM study_group_configurations c WHERE c.study_group_id=schedule.study_group_id AND c.superseded_at IS NULL ORDER BY c.effective_from DESC,c.created_at DESC LIMIT 1))',
+      )
       .groupBy('study_group.id')
       .addGroupBy('study_group.name')
       .addGroupBy('schedule.id')

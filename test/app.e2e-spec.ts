@@ -551,6 +551,182 @@ describe('AppController (e2e)', () => {
       .expect(401);
   });
 
+  it('generates snapshots, finalizes atomically, protects history and audits dated overrides', async () => {
+    const owner = sessions.get(UserRole.Owner)!;
+    const tutor = sessions.get(UserRole.Tutor)!;
+    const operator = sessions.get(UserRole.Operator)!;
+    const api = request(app.getHttpServer());
+    const schedule = {
+      tutorId: ids.tutorId,
+      dayOfWeek: 2,
+      startTime: '09:00',
+      endTime: '10:00',
+    };
+    const group = await api
+      .post('/api/v1/study-groups')
+      .auth(owner.accessToken, { type: 'bearer' })
+      .set('X-Tenant-Id', ids.tenantId)
+      .send({
+        name: 'Dated E2E',
+        effectiveFrom: '2026-09-01',
+        effectiveUntil: '2026-09-22',
+        schedules: [schedule],
+        studentIds: [ids.studentId],
+      })
+      .expect(201);
+    const groupId = group.body.id as string;
+    const list = await api
+      .get('/api/v1/class-sessions')
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .query({ from: '2026-09-01', to: '2026-09-22', studyGroupId: groupId })
+      .expect(200);
+    expect(list.body.data).toHaveLength(4);
+    const [first, second, third] = list.body.data as Array<{
+      id: string;
+      version: number;
+    }>;
+    const detail = await api
+      .get(`/api/v1/class-sessions/${first.id}`)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .expect(200);
+    expect(detail.body.students).toHaveLength(1);
+    const snapshotName = detail.body.students[0].name as string;
+    await dataSource.manager.update(StudentEntity, ids.studentId, {
+      name: 'Master renamed after snapshot',
+    });
+    await api
+      .put(`/api/v1/class-sessions/${first.id}/record`)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .send({ version: 1, topic: 'Fractions', attendance: [] })
+      .expect(400);
+    await api
+      .get(`/api/v1/class-sessions/${first.id}`)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.topic).toBeNull();
+        expect(body.students[0].status).toBeNull();
+        expect(body.students[0].name).toBe(snapshotName);
+      });
+    const record = {
+      version: 1,
+      topic: 'Fractions',
+      tutorNote: 'Practice',
+      attendance: [{ studentId: ids.studentId, status: 'present' }],
+    };
+    await api
+      .put(`/api/v1/class-sessions/${first.id}/record`)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .send(record)
+      .expect(200);
+    await api
+      .put(`/api/v1/class-sessions/${first.id}/record`)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .send(record)
+      .expect(409);
+    await api
+      .put(`/api/v1/class-sessions/${first.id}/record`)
+      .auth(operator.accessToken, { type: 'bearer' })
+      .send({ ...record, version: 2, topic: 'Corrected fractions' })
+      .expect(200);
+    await api
+      .patch(`/api/v1/class-sessions/${second.id}`)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .send({ version: 1, reason: 'Moved', sessionDate: '2026-09-09' })
+      .expect(403);
+    await api
+      .patch(`/api/v1/class-sessions/${second.id}`)
+      .auth(operator.accessToken, { type: 'bearer' })
+      .send({ version: 1, reason: 'Moved', sessionDate: '2026-09-09' })
+      .expect(200);
+    await api
+      .patch(`/api/v1/class-sessions/${third.id}`)
+      .auth(operator.accessToken, { type: 'bearer' })
+      .send({ version: 1, reason: 'Holiday', status: 'cancelled' })
+      .expect(200);
+    await api
+      .post('/api/v1/study-groups')
+      .auth(operator.accessToken, { type: 'bearer' })
+      .send({
+        name: 'Conflicting session',
+        effectiveFrom: '2026-09-01',
+        effectiveUntil: '2026-09-01',
+        schedules: [schedule],
+        studentIds: [],
+      })
+      .expect(409);
+    const revision = await api
+      .post(`/api/v1/study-groups/${groupId}/configurations`)
+      .auth(operator.accessToken, { type: 'bearer' })
+      .send({
+        effectiveFrom: '2026-09-01',
+        effectiveUntil: '2026-09-29',
+        schedules: [{ ...schedule, id: group.body.schedules[0].id }],
+        studentIds: [ids.studentId],
+      })
+      .expect(201);
+    expect(revision.body.skipped).toBe(3);
+    const after = await api
+      .get('/api/v1/class-sessions')
+      .auth(operator.accessToken, { type: 'bearer' })
+      .query({ from: '2026-09-01', to: '2026-09-30', studyGroupId: groupId })
+      .expect(200);
+    expect(after.body.data).toHaveLength(5);
+    expect(
+      after.body.data.filter(
+        (s: { sessionDate: string }) => s.sessionDate === '2026-09-08',
+      ),
+    ).toHaveLength(0);
+    await api
+      .get(`/api/v1/class-sessions/${first.id}`)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.topic).toBe('Corrected fractions');
+        expect(body.students[0].name).toBe(snapshotName);
+      });
+    await dataSource.query(
+      'UPDATE class_sessions SET locked_at=NOW(),lock_reason=? WHERE id=?',
+      ['Payroll test', first.id],
+    );
+    await api
+      .put(`/api/v1/class-sessions/${first.id}/record`)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .send({ ...record, version: 3 })
+      .expect(409);
+    const audits = (await dataSource.query(
+      'SELECT action,before_data,after_data FROM class_session_audits WHERE session_id IN (?,?,?)',
+      [first.id, second.id, third.id],
+    )) as Array<{ action: string; before_data: unknown; after_data: unknown }>;
+    expect(audits).toHaveLength(4);
+    expect(audits.every((a) => a.before_data && a.after_data)).toBe(true);
+    const foreign = await dataSource.manager.findOneByOrFail(StudentEntity, {
+      id: ids.otherTenantStudentId,
+    });
+    await api
+      .get(`/api/v1/class-sessions/${first.id}`)
+      .auth(owner.accessToken, { type: 'bearer' })
+      .set('X-Tenant-Id', foreign.tenantId)
+      .expect(404);
+    const unassigned = await dataSource.manager.save(
+      dataSource.manager.create(TutorEntity, {
+        tenantId: ids.tenantId,
+        name: 'Unassigned tutor',
+        phoneNumber: '081234567899',
+        sessionRate: '0.00',
+        status: EntityStatus.Active,
+      }),
+    );
+    await dataSource.query('UPDATE class_sessions SET tutor_id=? WHERE id=?', [
+      unassigned.id,
+      second.id,
+    ]);
+    await api
+      .get(`/api/v1/class-sessions/${second.id}`)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .expect(403);
+  });
+
   it('rate-limits repeated login failures per IP and email', async () => {
     const statuses: number[] = [];
     for (let attempt = 0; attempt < 6; attempt += 1) {

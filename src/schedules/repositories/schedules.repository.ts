@@ -66,7 +66,7 @@ export class SchedulesRepository {
             .select('COUNT(*)')
             .from(StudyGroupStudentEntity, 'member')
             .where('member.tenant_id = schedule.tenant_id')
-            .andWhere('member.study_group_id = schedule.study_group_id'),
+            .andWhere('member.configuration_id = schedule.configuration_id'),
         'student_count',
       );
 
@@ -119,7 +119,10 @@ export class SchedulesRepository {
       )
       .innerJoin('schedule.tutor', 'tutor')
       .leftJoin('schedule.room', 'room')
-      .where('schedule.tenant_id = :tenantId', { tenantId });
+      .where('schedule.tenant_id = :tenantId', { tenantId })
+      .andWhere(
+        'schedule.configuration_id = (SELECT c.id FROM study_group_configurations c WHERE c.study_group_id = schedule.study_group_id AND c.superseded_at IS NULL ORDER BY c.effective_from DESC, c.created_at DESC LIMIT 1)',
+      );
   }
 
   private applyFilters(

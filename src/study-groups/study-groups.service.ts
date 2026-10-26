@@ -1,18 +1,16 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { DataSource, EntityManager, In } from 'typeorm';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { DataSource, EntityManager, In, IsNull } from 'typeorm';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user.type.js';
+import { ConfigurationsService } from '../class-sessions/configurations.service.js';
+import { ClassSessionsService } from '../class-sessions/class-sessions.service.js';
+import { ClassSessionEntity } from '../class-sessions/entities/class-session.entity.js';
+import { StudyGroupConfigurationEntity } from '../class-sessions/entities/study-group-configuration.entity.js';
+import { jakartaDate, legacyEndDate } from '../class-sessions/session-dates.js';
 import {
   createPaginationMeta,
   PaginatedResponse,
 } from '../common/dto/pagination-query.dto.js';
 import { EntityStatus } from '../common/enums/entity-status.enum.js';
-import { StudentEntity } from '../students/entities/student.entity.js';
-import { TutorEntity } from '../tutors/entities/tutor.entity.js';
-import { RoomEntity } from '../rooms/entities/room.entity.js';
 import {
   CreateStudyGroupDto,
   StudyGroupsQueryDto,
@@ -30,7 +28,11 @@ import { StudyGroupEntity } from './entities/study-group.entity.js';
 
 @Injectable()
 export class StudyGroupsService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly configurations: ConfigurationsService,
+    private readonly sessions: ClassSessionsService,
+  ) {}
   async findAll(
     tenantId: string,
     query: StudyGroupsQueryDto,
@@ -41,19 +43,19 @@ export class StudyGroupsService {
       .where('group.tenant_id = :tenantId', { tenantId });
     if (query.search)
       groups.andWhere(
-        '(group.name LIKE :search OR EXISTS (SELECT 1 FROM study_group_schedules s INNER JOIN tutors t ON t.id = s.tutor_id WHERE s.study_group_id = group.id AND t.name LIKE :search))',
+        '(group.name LIKE :search OR EXISTS (SELECT 1 FROM study_group_schedules s INNER JOIN tutors t ON t.id = s.tutor_id WHERE s.study_group_id = group.id AND s.configuration_id = (SELECT c.id FROM study_group_configurations c WHERE c.study_group_id = group.id AND c.superseded_at IS NULL ORDER BY c.effective_from DESC, c.created_at DESC LIMIT 1) AND t.name LIKE :search))',
         { search: `%${query.search}%` },
       );
     if (query.status)
       groups.andWhere('group.status = :status', { status: query.status });
     if (query.tutorId)
       groups.andWhere(
-        'EXISTS (SELECT 1 FROM study_group_schedules s WHERE s.study_group_id = group.id AND s.tutor_id = :tutorId)',
+        'EXISTS (SELECT 1 FROM study_group_schedules s WHERE s.study_group_id = group.id AND s.configuration_id = (SELECT c.id FROM study_group_configurations c WHERE c.study_group_id = group.id AND c.superseded_at IS NULL ORDER BY c.effective_from DESC, c.created_at DESC LIMIT 1) AND s.tutor_id = :tutorId)',
         { tutorId: query.tutorId },
       );
     if (query.dayOfWeek)
       groups.andWhere(
-        'EXISTS (SELECT 1 FROM study_group_schedules s WHERE s.study_group_id = group.id AND s.day_of_week = :dayOfWeek)',
+        'EXISTS (SELECT 1 FROM study_group_schedules s WHERE s.study_group_id = group.id AND s.configuration_id = (SELECT c.id FROM study_group_configurations c WHERE c.study_group_id = group.id AND c.superseded_at IS NULL ORDER BY c.effective_from DESC, c.created_at DESC LIMIT 1) AND s.day_of_week = :dayOfWeek)',
         { dayOfWeek: query.dayOfWeek },
       );
     const [entities, total] = await groups
@@ -73,23 +75,12 @@ export class StudyGroupsService {
       .addSelect("SUM(group.status = 'inactive')", 'inactive')
       .where('group.tenant_id = :tenantId', { tenantId })
       .getRawOne<{ total: string; active: string; inactive: string }>();
-    const day = new Intl.DateTimeFormat('en-US', {
-      weekday: 'short',
-      timeZone: 'Asia/Jakarta',
-    }).format(new Date());
-    const weekday =
-      ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(day) || 7;
     const schedulesToday = await this.dataSource
-      .getRepository(StudyGroupScheduleEntity)
-      .createQueryBuilder('schedule')
-      .innerJoin(
-        StudyGroupEntity,
-        'group',
-        'group.id = schedule.study_group_id',
-      )
+      .getRepository(ClassSessionEntity)
+      .createQueryBuilder('session')
       .where(
-        'schedule.tenant_id = :tenantId AND schedule.day_of_week = :weekday AND group.status = :status',
-        { tenantId, weekday, status: EntityStatus.Active },
+        'session.tenant_id = :tenantId AND session.session_date = :today AND session.status <> :cancelled',
+        { tenantId, today: jakartaDate(), cancelled: 'cancelled' },
       )
       .getCount();
     return {
@@ -102,9 +93,22 @@ export class StudyGroupsService {
   async findOne(tenantId: string, id: string): Promise<StudyGroupResponseDto> {
     const group = await this.requireGroup(tenantId, id);
     const item = (await this.toListItems(tenantId, [group]))[0];
+    const latest = await this.dataSource.manager.findOne(
+      StudyGroupConfigurationEntity,
+      {
+        where: { tenantId, studyGroupId: id, supersededAt: IsNull() },
+        order: { effectiveFrom: 'DESC', createdAt: 'DESC' },
+      },
+    );
     const students = await this.dataSource
       .getRepository(StudyGroupStudentEntity)
-      .find({ where: { tenantId, studyGroupId: id } });
+      .find({
+        where: {
+          tenantId,
+          studyGroupId: id,
+          ...(latest ? { configurationId: latest.id } : {}),
+        },
+      });
     return {
       ...item,
       tenantId: group.tenantId,
@@ -116,15 +120,17 @@ export class StudyGroupsService {
   create(
     tenantId: string,
     dto: CreateStudyGroupDto,
+    actor: AuthenticatedUser,
   ): Promise<StudyGroupResponseDto> {
-    return this.save(tenantId, null, dto);
+    return this.save(tenantId, null, dto, actor);
   }
   update(
     tenantId: string,
     id: string,
     dto: UpdateStudyGroupDto,
+    actor: AuthenticatedUser,
   ): Promise<StudyGroupResponseDto> {
-    return this.save(tenantId, id, dto);
+    return this.save(tenantId, id, dto, actor);
   }
   async updateStatus(
     tenantId: string,
@@ -132,17 +138,8 @@ export class StudyGroupsService {
     status: EntityStatus,
   ): Promise<StudyGroupResponseDto> {
     await this.dataSource.transaction(async (manager) => {
+      await this.sessions.lockTenant(manager, tenantId);
       const group = await this.requireGroup(tenantId, id, manager);
-      if (status === EntityStatus.Active) {
-        const detail = await this.loadInput(manager, tenantId, id);
-        await this.validate(
-          manager,
-          tenantId,
-          id,
-          detail.schedules,
-          detail.studentIds,
-        );
-      }
       group.status = status;
       await manager.save(group);
     });
@@ -152,10 +149,10 @@ export class StudyGroupsService {
     tenantId: string,
     id: string | null,
     dto: CreateStudyGroupDto,
+    actor: AuthenticatedUser,
   ): Promise<StudyGroupResponseDto> {
-    let savedGroupId: string | null = null;
-    await this.dataSource.transaction(async (manager) => {
-      this.assertScheduleTimes(dto);
+    const savedGroupId = await this.dataSource.transaction(async (manager) => {
+      await this.sessions.lockTenant(manager, tenantId);
       const group = id
         ? await this.requireGroup(tenantId, id, manager)
         : manager.create(StudyGroupEntity, {
@@ -163,247 +160,18 @@ export class StudyGroupsService {
             name: dto.name,
             status: EntityStatus.Active,
           });
-      await this.validate(
-        manager,
-        tenantId,
-        id,
-        dto.schedules,
-        dto.studentIds ?? [],
-      );
-      group.name = dto.name;
       await manager.save(group);
-      savedGroupId = group.id;
-      if (id) {
-        await manager.delete(StudyGroupScheduleEntity, {
-          tenantId,
-          studyGroupId: id,
-        });
-        await manager.delete(StudyGroupStudentEntity, {
-          tenantId,
-          studyGroupId: id,
-        });
-      }
-      await manager.save(
-        StudyGroupScheduleEntity,
-        dto.schedules.map((s, index) =>
-          manager.create(StudyGroupScheduleEntity, {
-            tenantId,
-            studyGroupId: group.id,
-            tutorId: s.tutorId,
-            roomId: s.roomId ?? null,
-            dayOfWeek: s.dayOfWeek,
-            startTime: `${s.startTime}:00`,
-            endTime: `${s.endTime}:00`,
-            sortOrder: index,
-          }),
-        ),
-      );
-      if (dto.studentIds?.length)
-        await manager.save(
-          StudyGroupStudentEntity,
-          dto.studentIds.map((studentId) =>
-            manager.create(StudyGroupStudentEntity, {
-              tenantId,
-              studyGroupId: group.id,
-              studentId,
-            }),
-          ),
-        );
+      const effectiveFrom = dto.effectiveFrom ?? jakartaDate();
+      await this.configurations.save(manager, actor, group.id, {
+        name: dto.name,
+        effectiveFrom,
+        effectiveUntil: dto.effectiveUntil ?? legacyEndDate(effectiveFrom),
+        schedules: dto.schedules,
+        studentIds: dto.studentIds ?? [],
+      });
+      return group.id;
     });
-    if (!savedGroupId)
-      throw new NotFoundException('Kelompok belajar tidak ditemukan');
     return this.findOne(tenantId, savedGroupId);
-  }
-  private async validate(
-    manager: EntityManager,
-    tenantId: string,
-    selfId: string | null,
-    schedules: CreateStudyGroupDto['schedules'],
-    studentIds: string[],
-  ): Promise<void> {
-    const tutorIds = [...new Set(schedules.map((s) => s.tutorId))];
-    const tutors = tutorIds.length
-      ? await manager.find(TutorEntity, {
-          where: { tenantId, id: In(tutorIds), status: EntityStatus.Active },
-        })
-      : [];
-    if (tutors.length !== tutorIds.length)
-      throw new BadRequestException(
-        'Tentor harus aktif dan berasal dari bimbel ini',
-      );
-    const roomIds = [
-      ...new Set(
-        schedules
-          .map((s) => s.roomId)
-          .filter((roomId): roomId is string => Boolean(roomId)),
-      ),
-    ];
-    const rooms = roomIds.length
-      ? await manager.find(RoomEntity, {
-          where: { tenantId, id: In(roomIds), status: EntityStatus.Active },
-        })
-      : [];
-    if (rooms.length !== roomIds.length)
-      throw new BadRequestException(
-        'Ruangan harus aktif dan berasal dari bimbel ini',
-      );
-    const students = studentIds.length
-      ? await manager.find(StudentEntity, {
-          where: { tenantId, id: In(studentIds), status: EntityStatus.Active },
-        })
-      : [];
-    if (students.length !== studentIds.length)
-      throw new BadRequestException(
-        'Siswa harus aktif dan berasal dari bimbel ini',
-      );
-    for (let i = 0; i < schedules.length; i += 1)
-      for (let j = i + 1; j < schedules.length; j += 1)
-        if (
-          schedules[i].dayOfWeek === schedules[j].dayOfWeek &&
-          this.overlaps(
-            schedules[i].startTime,
-            schedules[i].endTime,
-            schedules[j].startTime,
-            schedules[j].endTime,
-          )
-        )
-          throw new ConflictException(
-            schedules[i].tutorId === schedules[j].tutorId
-              ? 'Tentor memiliki jadwal yang bentrok di kelompok ini'
-              : 'Jadwal kelompok tidak boleh saling bertabrakan',
-          );
-    for (const schedule of schedules) {
-      const existing = await manager
-        .getRepository(StudyGroupScheduleEntity)
-        .createQueryBuilder('schedule')
-        .innerJoin(
-          StudyGroupEntity,
-          'group',
-          'group.id = schedule.study_group_id',
-        )
-        .where(
-          'schedule.tenant_id = :tenantId AND schedule.tutor_id = :tutorId AND schedule.day_of_week = :day AND group.status = :status',
-          {
-            tenantId,
-            tutorId: schedule.tutorId,
-            day: schedule.dayOfWeek,
-            status: EntityStatus.Active,
-          },
-        )
-        .andWhere(selfId ? 'schedule.study_group_id <> :selfId' : '1=1', {
-          selfId,
-        })
-        .getMany();
-      if (
-        existing.some((row) =>
-          this.overlaps(
-            schedule.startTime,
-            schedule.endTime,
-            row.startTime.slice(0, 5),
-            row.endTime.slice(0, 5),
-          ),
-        )
-      )
-        throw new ConflictException(
-          'Tentor sudah memiliki jadwal pada waktu tersebut',
-        );
-    }
-    if (roomIds.length) {
-      const roomSchedules = await manager
-        .getRepository(StudyGroupScheduleEntity)
-        .createQueryBuilder('schedule')
-        .innerJoin(
-          StudyGroupEntity,
-          'group',
-          'group.id = schedule.study_group_id',
-        )
-        .where(
-          'schedule.tenant_id = :tenantId AND schedule.room_id IN (:...roomIds) AND schedule.day_of_week IN (:...days) AND group.status = :status',
-          {
-            tenantId,
-            roomIds,
-            days: [
-              ...new Set(
-                schedules.filter((s) => s.roomId).map((s) => s.dayOfWeek),
-              ),
-            ],
-            status: EntityStatus.Active,
-          },
-        )
-        .andWhere(selfId ? 'schedule.study_group_id <> :selfId' : '1=1', {
-          selfId,
-        })
-        .getMany();
-      for (const schedule of schedules)
-        if (
-          schedule.roomId &&
-          roomSchedules.some(
-            (row) =>
-              row.roomId === schedule.roomId &&
-              row.dayOfWeek === schedule.dayOfWeek &&
-              this.overlaps(
-                schedule.startTime,
-                schedule.endTime,
-                row.startTime.slice(0, 5),
-                row.endTime.slice(0, 5),
-              ),
-          )
-        )
-          throw new ConflictException(
-            'Ruangan sudah digunakan pada rentang waktu ini. Pilih ruangan atau jam lain.',
-          );
-    }
-    if (studentIds.length)
-      for (const schedule of schedules) {
-        const rows = await manager
-          .getRepository(StudyGroupScheduleEntity)
-          .createQueryBuilder('schedule')
-          .innerJoin(
-            StudyGroupEntity,
-            'group',
-            'group.id = schedule.study_group_id',
-          )
-          .innerJoin(
-            StudyGroupStudentEntity,
-            'member',
-            'member.study_group_id = schedule.study_group_id AND member.tenant_id = schedule.tenant_id',
-          )
-          .where(
-            'schedule.tenant_id = :tenantId AND schedule.day_of_week = :day AND member.student_id IN (:...studentIds) AND group.status = :status',
-            {
-              tenantId,
-              day: schedule.dayOfWeek,
-              studentIds,
-              status: EntityStatus.Active,
-            },
-          )
-          .andWhere(selfId ? 'schedule.study_group_id <> :selfId' : '1=1', {
-            selfId,
-          })
-          .getMany();
-        if (
-          rows.some((row) =>
-            this.overlaps(
-              schedule.startTime,
-              schedule.endTime,
-              row.startTime.slice(0, 5),
-              row.endTime.slice(0, 5),
-            ),
-          )
-        )
-          throw new ConflictException(
-            'Salah satu siswa sudah memiliki jadwal pada waktu tersebut',
-          );
-      }
-  }
-  private assertScheduleTimes(dto: CreateStudyGroupDto) {
-    if (!dto.schedules.length)
-      throw new BadRequestException('Minimal satu jadwal diperlukan');
-    if (dto.schedules.some((s) => s.startTime >= s.endTime))
-      throw new BadRequestException('Jam selesai harus setelah jam mulai');
-  }
-  private overlaps(a: string, b: string, c: string, d: string) {
-    return a < d && c < b;
   }
   private async requireGroup(
     tenantId: string,
@@ -416,44 +184,47 @@ export class StudyGroupsService {
     if (!group) throw new NotFoundException('Kelompok belajar tidak ditemukan');
     return group;
   }
-  private async loadInput(
-    manager: EntityManager,
-    tenantId: string,
-    groupId: string,
-  ) {
-    const schedules = await manager.find(StudyGroupScheduleEntity, {
-      where: { tenantId, studyGroupId: groupId },
-    });
-    const members = await manager.find(StudyGroupStudentEntity, {
-      where: { tenantId, studyGroupId: groupId },
-    });
-    return {
-      schedules: schedules.map((s) => ({
-        tutorId: s.tutorId,
-        roomId: s.roomId ?? undefined,
-        dayOfWeek: s.dayOfWeek,
-        startTime: s.startTime.slice(0, 5),
-        endTime: s.endTime.slice(0, 5),
-      })),
-      studentIds: members.map((s) => s.studentId),
-    };
-  }
   private async toListItems(
     tenantId: string,
     groups: StudyGroupEntity[],
   ): Promise<StudyGroupListItemResponseDto[]> {
     if (!groups.length) return [];
     const ids = groups.map((g) => g.id);
+    const configurations = await this.dataSource.manager.find(
+      StudyGroupConfigurationEntity,
+      {
+        where: { tenantId, studyGroupId: In(ids), supersededAt: IsNull() },
+        order: { effectiveFrom: 'DESC', createdAt: 'DESC' },
+      },
+    );
+    const selected = new Map<string, string>();
+    for (const c of configurations)
+      if (!selected.has(c.studyGroupId)) selected.set(c.studyGroupId, c.id);
+    const configurationIds = [...selected.values()];
     const schedules = await this.dataSource
       .getRepository(StudyGroupScheduleEntity)
       .find({
-        where: { tenantId, studyGroupId: In(ids) },
+        where: {
+          tenantId,
+          studyGroupId: In(ids),
+          ...(configurationIds.length
+            ? { configurationId: In(configurationIds) }
+            : {}),
+        },
         relations: { tutor: true, room: true },
         order: { sortOrder: 'ASC' },
       });
     const members = await this.dataSource
       .getRepository(StudyGroupStudentEntity)
-      .find({ where: { tenantId, studyGroupId: In(ids) } });
+      .find({
+        where: {
+          tenantId,
+          studyGroupId: In(ids),
+          ...(configurationIds.length
+            ? { configurationId: In(configurationIds) }
+            : {}),
+        },
+      });
     return groups.map((group) => {
       const groupSchedules: StudyGroupScheduleResponseDto[] = schedules
         .filter((s) => s.studyGroupId === group.id)

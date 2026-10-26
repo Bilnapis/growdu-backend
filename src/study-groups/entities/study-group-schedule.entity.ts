@@ -23,6 +23,14 @@ import { StudyGroupEntity } from './study-group.entity.js';
   'dayOfWeek',
 ])
 export class StudyGroupScheduleEntity {
+  @Column({ name: 'series_id', type: 'char', length: 36 }) seriesId: string;
+  @Column({
+    name: 'configuration_id',
+    type: 'char',
+    length: 36,
+    nullable: true,
+  })
+  configurationId: string | null;
   @PrimaryGeneratedColumn('uuid') id: string;
   @Column({ name: 'tenant_id', type: 'char', length: 36 }) tenantId: string;
   @Column({ name: 'study_group_id', type: 'char', length: 36 })

@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { randomUUID } from 'node:crypto';
 import { type NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
@@ -247,6 +248,7 @@ describe('Rooms API (e2e)', () => {
     );
     await dataSource.manager.save(
       dataSource.manager.create(StudyGroupScheduleEntity, {
+        seriesId: randomUUID(),
         tenantId,
         studyGroupId: group.id,
         tutorId: tutor.id,

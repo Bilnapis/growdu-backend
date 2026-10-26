@@ -9,6 +9,7 @@ import { AddTutorProfileDetails20261004000000 } from '../src/database/migrations
 import { AddOperatorAddress20261024000000 } from '../src/database/migrations/20261024000000-AddOperatorAddress.js';
 import { CreateStudyGroups20261025000000 } from '../src/database/migrations/20261025000000-CreateStudyGroups.js';
 import { CreateRoomsAndAssignSchedules20261026000000 } from '../src/database/migrations/20261026000000-CreateRoomsAndAssignSchedules.js';
+import { CreateDatedSessions20261027000000 } from '../src/database/migrations/20261027000000-CreateDatedSessions.js';
 
 const databaseNamePattern = /^growdu_e2e_\d+_\d+$/;
 
@@ -50,6 +51,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
         AddOperatorAddress20261024000000,
         CreateStudyGroups20261025000000,
         CreateRoomsAndAssignSchedules20261026000000,
+        CreateDatedSessions20261027000000,
       ],
       synchronize: false,
       migrationsRun: false,

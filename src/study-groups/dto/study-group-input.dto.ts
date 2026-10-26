@@ -5,6 +5,8 @@ import {
   IsArray,
   IsEnum,
   IsInt,
+  IsDateString,
+  Max,
   IsOptional,
   IsString,
   IsUUID,
@@ -34,6 +36,7 @@ export class StudyGroupScheduleInputDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(7)
   dayOfWeek: number;
   @ApiProperty({ example: '15:00' })
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
@@ -43,6 +46,16 @@ export class StudyGroupScheduleInputDto {
   endTime: string;
 }
 export class CreateStudyGroupDto {
+  @ApiPropertyOptional({ format: 'date' })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  effectiveFrom?: string;
+  @ApiPropertyOptional({ format: 'date' })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  effectiveUntil?: string;
   @ApiProperty({ minLength: 2, maxLength: 150 })
   @Transform(trim)
   @IsString()
