@@ -997,6 +997,59 @@ describe('AppController (e2e)', () => {
       .expect(403);
   });
 
+  it('lets tutors update only their own bank account and rejects unrelated fields', async () => {
+    const tutor = sessions.get(UserRole.Tutor)!;
+    const operator = sessions.get(UserRole.Operator)!;
+    const api = request(app.getHttpServer());
+    const path = '/api/v1/tutors/me/bank-account';
+    const input = {
+      bankName: ' Bank BCA ',
+      accountNumber: ' 001234567890 ',
+      accountName: ' Tutor E2E ',
+    };
+    const before = await dataSource.manager.findOneByOrFail(TutorEntity, {
+      id: ids.tutorId,
+    });
+
+    await api.patch(path).send(input).expect(401);
+    await api
+      .patch(path)
+      .auth(operator.accessToken, { type: 'bearer' })
+      .send(input)
+      .expect(403);
+    await api
+      .patch(path)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .send({ ...input, sessionRate: '999999.00' })
+      .expect(400);
+    await api
+      .patch(path)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .send({ ...input, bankName: ' ' })
+      .expect(400);
+    await api
+      .patch(path)
+      .auth(tutor.accessToken, { type: 'bearer' })
+      .send(input)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          id: ids.tutorId,
+          bankName: 'Bank BCA',
+          accountNumber: '001234567890',
+          accountName: 'Tutor E2E',
+          name: before.name,
+          sessionRate: before.sessionRate,
+        });
+      });
+    const after = await dataSource.manager.findOneByOrFail(TutorEntity, {
+      id: ids.tutorId,
+    });
+    expect(after.accountNumber).toBe('001234567890');
+    expect(after.email).toBe(before.email);
+    expect(after.status).toBe(before.status);
+  });
+
   it('rate-limits repeated login failures per IP and email', async () => {
     const statuses: number[] = [];
     for (let attempt = 0; attempt < 6; attempt += 1) {

@@ -23,6 +23,7 @@ import {
 import { TutorResponseDto } from './dto/tutor-response.dto.js';
 import { TutorEntity } from './entities/tutor.entity.js';
 import { TutorsRepository } from './repositories/tutors.repository.js';
+import { UpdateTutorBankAccountDto } from './dto/update-tutor-bank-account.dto.js';
 import { UpdateTutorProfileDto } from './dto/update-tutor-profile.dto.js';
 
 @Injectable()
@@ -112,6 +113,19 @@ export class TutorsService {
       address: dto.address,
       expertise: dto.expertise,
       education: dto.education,
+    });
+  }
+
+  async updateMyBankAccount(
+    tenantId: string,
+    userId: string,
+    dto: UpdateTutorBankAccountDto,
+  ): Promise<TutorResponseDto> {
+    const tutor = await this.findMe(tenantId, userId);
+    return this.update(tenantId, tutor.id, {
+      bankName: dto.bankName,
+      accountNumber: dto.accountNumber,
+      accountName: dto.accountName,
     });
   }
 

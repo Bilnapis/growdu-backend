@@ -34,6 +34,7 @@ import {
 import { TutorResponseDto } from './dto/tutor-response.dto.js';
 import { TutorsService } from './tutors.service.js';
 import { UpdateTutorProfileDto } from './dto/update-tutor-profile.dto.js';
+import { UpdateTutorBankAccountDto } from './dto/update-tutor-bank-account.dto.js';
 
 @ApiTags('Tutors')
 @ApiBearerAuth()
@@ -62,6 +63,16 @@ export class TutorsController {
     @Body() dto: UpdateTutorProfileDto,
   ): Promise<TutorResponseDto> {
     return this.tutorsService.updateMe(user.tenantId, user.id, dto);
+  }
+
+  @Patch('me/bank-account')
+  @Roles(UserRole.Tutor)
+  @ApiOkResponse({ type: TutorResponseDto })
+  updateMyBankAccount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateTutorBankAccountDto,
+  ): Promise<TutorResponseDto> {
+    return this.tutorsService.updateMyBankAccount(user.tenantId, user.id, dto);
   }
 
   @Get()
