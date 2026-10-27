@@ -551,6 +551,175 @@ describe('AppController (e2e)', () => {
       .expect(401);
   });
 
+  it("lists only a tutor's students with safe fields, search, pagination and current memberships", async () => {
+    const tutor = sessions.get(UserRole.Tutor)!;
+    const operator = sessions.get(UserRole.Operator)!;
+    const parent = sessions.get(UserRole.Parent)!;
+    const api = request(app.getHttpServer());
+    const mine = (query: Record<string, string | number> = {}) =>
+      api
+        .get('/api/v1/students/mine')
+        .auth(tutor.accessToken, { type: 'bearer' })
+        .query(query);
+
+    await mine()
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data).toEqual([]);
+        expect(body.meta.total).toBe(0);
+      });
+    await api.get('/api/v1/students/mine').expect(401);
+    for (const session of [operator, parent]) {
+      await api
+        .get('/api/v1/students/mine')
+        .auth(session.accessToken, { type: 'bearer' })
+        .expect(403);
+    }
+    await mine({ limit: 101 }).expect(400);
+    await mine({ search: 'a'.repeat(101) }).expect(400);
+    const detail = (id = ids.studentId) =>
+      api
+        .get(`/api/v1/students/mine/${id}`)
+        .auth(tutor.accessToken, { type: 'bearer' });
+    await detail().expect(404);
+    await detail(ids.otherTenantStudentId).expect(404);
+    await detail('invalid-id').expect(400);
+    await api.get(`/api/v1/students/mine/${ids.studentId}`).expect(401);
+    for (const session of [operator, parent]) {
+      await api
+        .get(`/api/v1/students/mine/${ids.studentId}`)
+        .auth(session.accessToken, { type: 'bearer' })
+        .expect(403);
+    }
+
+    const groupIds: string[] = [];
+    for (const [index, name] of [
+      'Tutor students A',
+      'Tutor students B',
+    ].entries()) {
+      const group = await api
+        .post('/api/v1/study-groups')
+        .auth(operator.accessToken, { type: 'bearer' })
+        .send({
+          name,
+          effectiveFrom: '2027-01-01',
+          effectiveUntil: '2027-01-31',
+          schedules: [
+            {
+              tutorId: ids.tutorId,
+              dayOfWeek: index + 1,
+              startTime: '15:00',
+              endTime: '16:00',
+            },
+          ],
+          studentIds: [ids.studentId],
+        })
+        .expect(201);
+      groupIds.push(group.body.id as string);
+    }
+
+    await mine({ limit: 1, search: 'Student E2E' })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.meta).toEqual({
+          page: 1,
+          limit: 1,
+          total: 1,
+          totalPages: 1,
+        });
+        expect(body.data).toHaveLength(1);
+        expect(body.data[0]).toEqual({
+          id: ids.studentId,
+          name: 'Student E2E',
+          school: 'SMP GrowDu',
+          educationLevel: 'SMP',
+          studyGroups: [
+            { id: groupIds[0], name: 'Tutor students A' },
+            { id: groupIds[1], name: 'Tutor students B' },
+          ],
+        });
+      });
+    await detail()
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          id: ids.studentId,
+          name: 'Student E2E',
+          school: 'SMP GrowDu',
+          educationLevel: 'SMP',
+          gender: 'female',
+          studyGroups: [
+            { id: groupIds[0], name: 'Tutor students A' },
+            { id: groupIds[1], name: 'Tutor students B' },
+          ],
+        });
+      });
+    await detail(ids.otherTenantStudentId).expect(404);
+
+    const tutorProfile = await dataSource.manager.findOneByOrFail(TutorEntity, {
+      id: ids.tutorId,
+    });
+    await dataSource.manager.update(TutorEntity, ids.tutorId, { userId: null });
+    try {
+      await mine().expect(401);
+    } finally {
+      await dataSource.manager.update(TutorEntity, ids.tutorId, {
+        userId: tutorProfile.userId,
+      });
+    }
+
+    await mine({ page: 2, limit: 1 })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data).toEqual([]);
+        expect(body.meta.total).toBe(1);
+      });
+    await mine({ search: 'Other Tenant Student' })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data).toEqual([]);
+      });
+
+    await api
+      .post(`/api/v1/study-groups/${groupIds[0]}/configurations`)
+      .auth(operator.accessToken, { type: 'bearer' })
+      .send({
+        effectiveFrom: '2027-01-01',
+        effectiveUntil: '2027-01-31',
+        schedules: [
+          {
+            tutorId: ids.tutorId,
+            dayOfWeek: 1,
+            startTime: '15:00',
+            endTime: '16:00',
+          },
+        ],
+        studentIds: [],
+      })
+      .expect(201);
+    await mine()
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data[0].studyGroups).toEqual([
+          { id: groupIds[1], name: 'Tutor students B' },
+        ]);
+      });
+    await detail()
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.studyGroups).toEqual([
+          { id: groupIds[1], name: 'Tutor students B' },
+        ]);
+      });
+    await dataSource.manager.update('study_groups', groupIds[1], {
+      status: EntityStatus.Inactive,
+    });
+    await mine()
+      .expect(200)
+      .expect(({ body }) => expect(body.data).toEqual([]));
+    await detail().expect(404);
+  });
+
   it('generates snapshots, finalizes atomically, protects history and audits dated overrides', async () => {
     const owner = sessions.get(UserRole.Owner)!;
     const tutor = sessions.get(UserRole.Tutor)!;

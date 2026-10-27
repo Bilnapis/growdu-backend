@@ -9,6 +9,7 @@ import { StudentsRepository } from './repositories/students.repository.js';
 import { StudentsController } from './students.controller.js';
 import { StudentsService } from './students.service.js';
 import { StudentRegistrationService } from './student-registration.service.js';
+import { TutorStudentsService } from './tutor-students.service.js';
 
 @Module({
   imports: [
@@ -21,7 +22,12 @@ import { StudentRegistrationService } from './student-registration.service.js';
     SecurityModule,
   ],
   controllers: [StudentsController],
-  providers: [StudentsRepository, StudentsService, StudentRegistrationService],
+  providers: [
+    StudentsRepository,
+    StudentsService,
+    StudentRegistrationService,
+    TutorStudentsService,
+  ],
   exports: [StudentsRepository, StudentsService],
 })
 export class StudentsModule {}

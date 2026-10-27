@@ -22,7 +22,15 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { TenantScoped } from '../auth/decorators/tenant-scoped.decorator.js';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type.js';
-import { PaginatedResponse } from '../common/dto/pagination-query.dto.js';
+import {
+  PaginatedResponse,
+  PaginationQueryDto,
+} from '../common/dto/pagination-query.dto.js';
+import {
+  TutorStudentDetailResponseDto,
+  TutorStudentResponseDto,
+} from './dto/tutor-student-response.dto.js';
+import { TutorStudentsService } from './tutor-students.service.js';
 import { ApiPaginatedResponse } from '../common/swagger/api-paginated-response.decorator.js';
 import { ApiProtectedEndpointErrors } from '../common/swagger/api-error-responses.decorator.js';
 import { UserRole } from '../users/entities/user.entity.js';
@@ -59,7 +67,28 @@ export class StudentsController {
   constructor(
     private readonly studentsService: StudentsService,
     private readonly studentRegistrationService: StudentRegistrationService,
+    private readonly tutorStudentsService: TutorStudentsService,
   ) {}
+
+  @Get('mine')
+  @Roles(UserRole.Tutor)
+  @ApiPaginatedResponse(TutorStudentResponseDto)
+  findMine(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<TutorStudentResponseDto>> {
+    return this.tutorStudentsService.findAll(user.tenantId, user.id, query);
+  }
+
+  @Get('mine/:id')
+  @Roles(UserRole.Tutor)
+  @ApiOkResponse({ type: TutorStudentDetailResponseDto })
+  findMyStudent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<TutorStudentDetailResponseDto> {
+    return this.tutorStudentsService.findOne(user.tenantId, user.id, id);
+  }
 
   @Get()
   @ApiPaginatedResponse(StudentListItemResponseDto)
