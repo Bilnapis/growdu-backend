@@ -19,19 +19,24 @@ export class TenantLogoStorageService {
     private readonly config: ConfigType<typeof appConfig>,
   ) {}
 
-  async store(file: TenantLogoUpload | undefined): Promise<string> {
+  async store(
+    file: TenantLogoUpload | undefined,
+    maxBytes = MAX_LOGO_FILE_SIZE,
+  ): Promise<string> {
     if (!file || !Buffer.isBuffer(file.buffer)) {
       throw new BadRequestException('Logo image is required');
     }
-    if (file.size > MAX_LOGO_FILE_SIZE) {
-      throw new BadRequestException('Logo image must be 5 MB or smaller');
+    if (file.buffer.length > maxBytes) {
+      throw new BadRequestException(
+        `Logo image must be ${maxBytes / (1024 * 1024)} MB or smaller`,
+      );
     }
 
     const image = getSquareImageMetadata(file.buffer);
     if (!image) {
       throw new BadRequestException('Logo must be a valid PNG or JPEG image');
     }
-    if (image.width !== image.height) {
+    if (image.width < 1 || image.height < 1 || image.width !== image.height) {
       throw new BadRequestException('Logo image must have a 1:1 aspect ratio');
     }
 
@@ -40,7 +45,8 @@ export class TenantLogoStorageService {
     await mkdir(directory, { recursive: true });
     await writeFile(join(directory, filename), file.buffer, { flag: 'wx' });
 
-    const publicBaseUrl = this.config.publicBaseUrl.trim() || 'http://localhost:3000';
+    const publicBaseUrl =
+      this.config.publicBaseUrl.trim() || 'http://localhost:3000';
     return new URL(
       `/uploads/tenant-logos/${filename}`,
       publicBaseUrl,
@@ -64,7 +70,10 @@ function getPngDimensions(
   buffer: Buffer,
 ): { width: number; height: number } | null {
   const pngSignature = '89504e470d0a1a0a';
-  if (buffer.length < 24 || buffer.subarray(0, 8).toString('hex') !== pngSignature) {
+  if (
+    buffer.length < 24 ||
+    buffer.subarray(0, 8).toString('hex') !== pngSignature
+  ) {
     return null;
   }
   if (buffer.subarray(12, 16).toString('ascii') !== 'IHDR') return null;
@@ -78,7 +87,8 @@ function getPngDimensions(
 function getJpegDimensions(
   buffer: Buffer,
 ): { width: number; height: number } | null {
-  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) return null;
+  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8)
+    return null;
 
   let offset = 2;
   while (offset + 8 <= buffer.length) {
@@ -93,7 +103,8 @@ function getJpegDimensions(
     if (marker === 0xda || offset + 2 > buffer.length) break;
 
     const segmentLength = buffer.readUInt16BE(offset);
-    if (segmentLength < 2 || offset + segmentLength > buffer.length) return null;
+    if (segmentLength < 2 || offset + segmentLength > buffer.length)
+      return null;
     if (isStartOfFrameMarker(marker)) {
       return {
         height: buffer.readUInt16BE(offset + 3),

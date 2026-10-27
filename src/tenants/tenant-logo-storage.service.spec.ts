@@ -11,11 +11,42 @@ vi.mock('node:fs/promises', () => ({
 }));
 
 describe('TenantLogoStorageService', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('enforces the requested limit using actual buffer bytes while retaining the platform limit', async () => {
+    const service = new TenantLogoStorageService(createAppConfig());
+    const image = Buffer.concat([
+      createPng(128, 128),
+      Buffer.alloc(2 * 1024 * 1024),
+    ]);
+    await expect(
+      service.store({ buffer: image, size: 1 }, 2 * 1024 * 1024),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.store({ buffer: image, size: image.length }),
+    ).resolves.toMatch(/\.png$/);
+  });
+
+  it('rejects missing, invalid and zero-sized images before writing', async () => {
+    const service = new TenantLogoStorageService(createAppConfig());
+    for (const file of [
+      undefined,
+      { buffer: Buffer.from('not an image'), size: 12 },
+      { buffer: createPng(0, 0), size: 24 },
+    ]) {
+      await expect(service.store(file)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    }
+    expect(writeFile).not.toHaveBeenCalled();
+  });
   it('stores a square PNG and returns its public URL', async () => {
     const service = new TenantLogoStorageService(createAppConfig());
     const image = createPng(128, 128);
 
-    await expect(service.store({ buffer: image, size: image.length })).resolves.toMatch(
+    await expect(
+      service.store({ buffer: image, size: image.length }),
+    ).resolves.toMatch(
       /^https:\/\/api\.growdu\.test\/uploads\/tenant-logos\/.+\.png$/,
     );
     expect(vi.mocked(mkdir)).toHaveBeenCalledWith(expect.any(String), {
@@ -40,7 +71,9 @@ describe('TenantLogoStorageService', () => {
     });
     const image = createPng(64, 64);
 
-    await expect(service.store({ buffer: image, size: image.length })).resolves.toMatch(
+    await expect(
+      service.store({ buffer: image, size: image.length }),
+    ).resolves.toMatch(
       /^http:\/\/localhost:3000\/uploads\/tenant-logos\/.+\.png$/,
     );
   });

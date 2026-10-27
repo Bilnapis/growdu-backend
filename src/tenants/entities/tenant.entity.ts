@@ -43,6 +43,17 @@ export class TenantEntity {
   @Column({ name: 'logo_url', type: 'varchar', length: 500, nullable: true })
   logoUrl: string | null;
 
+  @Column({ name: 'website_url', type: 'varchar', length: 500, nullable: true })
+  websiteUrl: string | null;
+
+  @Column({
+    name: 'primary_color',
+    type: 'char',
+    length: 7,
+    default: '#1F8FE5',
+  })
+  primaryColor: string;
+
   @Column({ type: 'enum', enum: EntityStatus, default: EntityStatus.Active })
   status: EntityStatus;
 

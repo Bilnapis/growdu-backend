@@ -144,6 +144,29 @@ dengan nama acak, menjalankan `run → revert → run`, lalu menghapus database 
 npm run migration:verify
 ```
 
+## Pengaturan bimbel
+
+`GET /api/v1/tenants/me` dan `GET /api/v1/tenants/owned` menyertakan
+`websiteUrl` (nullable) dan `primaryColor` (HEX `#RRGGBB`, default `#1F8FE5`).
+Owner memilih bimbel melalui header `X-Tenant-Id`; akun lain memakai tenant akun.
+Tentor dapat membaca identitas dan tema melalui `GET /tenants/me`.
+
+`PATCH /api/v1/tenants/me` memperbarui field yang dikirim saja. Owner dan operator
+dengan permission `settings` dapat mengubah data. Website harus URL HTTP(S),
+warna dinormalisasi menjadi HEX huruf kapital, dan field kontak opsional dapat
+dikosongkan dengan `null`. Nama dan warna tidak menerima `null`.
+
+`POST /api/v1/tenants/me/logo` menerima multipart field `file`: PNG/JPEG persegi,
+maksimal 2 MB. Response `201 { logoUrl }` belum mengubah logo tenant; kirim URL
+tersebut melalui `PATCH /tenants/me` setelah upload berhasil. File disimpan di
+`uploads/tenant-logos` dan disajikan melalui `/uploads`. Upload platform-admin
+tetap menerima hingga 5 MB dan memakai layanan penyimpanan yang sama.
+
+Jalankan migration `AddTenantSettings20261028000000` sebelum menjalankan backend
+baru, kemudian deploy frontend. Migration menambahkan website dan warna tanpa
+mengubah data lama; rollback menghapus kedua kolom tambahan. Cadangkan nilainya
+sebelum downgrade. Tidak ada environment variable baru.
+
 ## Autentikasi dan akses API
 
 Endpoint aplikasi menggunakan access JWT pada header

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { AddTenantSettings20261028000000 } from '../src/database/migrations/20261028000000-AddTenantSettings.js';
 import { CreateAnnouncements20261027200000 } from '../src/database/migrations/20261027200000-CreateAnnouncements.js';
 import mysql from 'mysql2/promise';
 import { DataSource } from 'typeorm';
@@ -56,6 +57,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
         CreateDatedSessions20261027000000,
         AddOperatorMenuPermissions20261027100000,
         CreateAnnouncements20261027200000,
+        AddTenantSettings20261028000000,
       ],
       synchronize: false,
       migrationsRun: false,

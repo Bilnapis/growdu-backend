@@ -24,6 +24,12 @@ export class TenantResponseDto {
   @ApiPropertyOptional({ nullable: true })
   logoUrl: string | null;
 
+  @ApiPropertyOptional({ nullable: true, maxLength: 500, format: 'uri' })
+  websiteUrl: string | null;
+
+  @ApiProperty({ example: '#1F8FE5', pattern: '^#[0-9A-F]{6}$' })
+  primaryColor: string;
+
   @ApiProperty({ enum: EntityStatus })
   status: EntityStatus;
 
@@ -42,6 +48,8 @@ export class TenantResponseDto {
       whatsappNumber: entity.whatsappNumber,
       email: entity.email,
       logoUrl: entity.logoUrl,
+      websiteUrl: entity.websiteUrl,
+      primaryColor: entity.primaryColor,
       status: entity.status,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,

@@ -6,6 +6,9 @@ import {
   MaxLength,
   MinLength,
   IsEnum,
+  IsUrl,
+  Matches,
+  ValidateIf,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
@@ -17,7 +20,7 @@ function trimNullable(value: unknown): unknown {
 
 export class UpdateTenantDto {
   @ApiPropertyOptional({ minLength: 2, maxLength: 150 })
-  @IsOptional()
+  @ValidateIf((_object, value: unknown) => value !== undefined)
   @Transform(({ value }: { value: unknown }) => trimNullable(value))
   @IsString()
   @MinLength(2)
@@ -57,6 +60,27 @@ export class UpdateTenantDto {
   @IsTenantLogoUrl()
   @MaxLength(500)
   logoUrl?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, maxLength: 500, format: 'uri' })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => trimNullable(value))
+  @IsString()
+  @IsUrl({
+    protocols: ['http', 'https'],
+    require_protocol: true,
+    disallow_auth: true,
+  })
+  @MaxLength(500)
+  websiteUrl?: string | null;
+
+  @ApiPropertyOptional({ example: '#1F8FE5', pattern: '^#[0-9A-Fa-f]{6}$' })
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
+  @IsString()
+  @Matches(/^#[0-9A-F]{6}$/)
+  primaryColor?: string;
 
   @ApiPropertyOptional({ enum: EntityStatus })
   @IsOptional()

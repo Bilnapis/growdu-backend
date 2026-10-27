@@ -1,10 +1,26 @@
-import { Body, Controller, Get, Patch } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiBadRequestResponse,
+  ApiPayloadTooLargeResponse,
 } from '@nestjs/swagger';
+import { RequireMenuAccess } from '../auth/decorators/require-menu-access.decorator.js';
+import { OperatorMenu } from '../operators/menu-permissions.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { TenantScoped } from '../auth/decorators/tenant-scoped.decorator.js';
@@ -14,6 +30,7 @@ import { UserRole } from '../users/entities/user.entity.js';
 import { TenantResponseDto } from './dto/tenant-response.dto.js';
 import { UpdateTenantDto } from './dto/update-tenant.dto.js';
 import { TenantsService } from './tenants.service.js';
+import type { TenantLogoUpload } from './tenant-logo-storage.service.js';
 
 @ApiTags('Tenants')
 @ApiBearerAuth()
@@ -45,6 +62,7 @@ export class TenantsController {
   @Patch('me')
   @TenantScoped()
   @Roles(UserRole.Owner, UserRole.Operator)
+  @RequireMenuAccess(OperatorMenu.Settings)
   @ApiOperation({ summary: 'Perbarui identitas tenant saat ini' })
   @ApiOkResponse({ type: TenantResponseDto })
   updateCurrent(
@@ -52,5 +70,44 @@ export class TenantsController {
     @Body() dto: UpdateTenantDto,
   ): Promise<TenantResponseDto> {
     return this.tenantsService.updateCurrent(user.tenantId, dto);
+  }
+
+  @Post('me/logo')
+  @TenantScoped()
+  @Roles(UserRole.Owner, UserRole.Operator)
+  @RequireMenuAccess(OperatorMenu.Settings)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+    }),
+  )
+  @ApiOperation({
+    summary:
+      'Unggah logo bimbel aktif; gunakan URL pada PATCH tenants/me untuk menyimpan',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      required: ['logoUrl'],
+      properties: { logoUrl: { type: 'string', format: 'uri' } },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'File harus PNG/JPEG persegi yang valid',
+  })
+  @ApiPayloadTooLargeResponse({ description: 'Ukuran file melebihi 2 MB' })
+  uploadLogo(
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() file: TenantLogoUpload | undefined,
+  ): Promise<{ logoUrl: string }> {
+    return this.tenantsService.uploadLogo(user.tenantId, file);
   }
 }

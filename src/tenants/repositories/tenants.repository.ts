@@ -21,10 +21,29 @@ export class TenantsRepository {
       .where('owner.user_id = :userId', { userId })
       .andWhere('tenant.status = :status', { status: 'active' })
       .orderBy('tenant.name', 'ASC')
-      .getMany()
+      .getMany();
   }
 
   save(tenant: TenantEntity): Promise<TenantEntity> {
     return this.repository.save(tenant);
+  }
+
+  async updateSettings(
+    id: string,
+    changes: Partial<
+      Pick<
+        TenantEntity,
+        | 'name'
+        | 'address'
+        | 'whatsappNumber'
+        | 'email'
+        | 'logoUrl'
+        | 'websiteUrl'
+        | 'primaryColor'
+        | 'status'
+      >
+    >,
+  ): Promise<void> {
+    await this.repository.update(id, changes);
   }
 }

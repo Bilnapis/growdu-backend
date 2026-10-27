@@ -38,7 +38,7 @@ import { PlatformAdminTenantsService } from './platform-admin-tenants.service.js
 import {
   TenantLogoStorageService,
   type TenantLogoUpload,
-} from './tenant-logo-storage.service.js';
+} from '../tenants/tenant-logo-storage.service.js';
 
 @ApiTags('Platform admin tenants')
 @ApiBearerAuth()
@@ -68,7 +68,9 @@ export class PlatformAdminTenantsController {
   }
 
   @Post('logo')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   @ApiOperation({ summary: 'Unggah logo bimbel berbentuk persegi' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
