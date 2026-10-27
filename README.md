@@ -223,3 +223,40 @@ Jalankan `npm run migration:run` untuk menerapkan
 `20261027100000-AddOperatorMenuPermissions` sebelum memakai fitur hak akses.
 Kolom JSON nullable mempertahankan akses akun lama. Rollback menghapus kolom
 beserta pengaturan aksesnya.
+
+### Pengumuman
+
+Terapkan migration `20261027200000-CreateAnnouncements` melalui
+`npm run migration:run` sebelum membuka `/announcements`. Rollback migration
+menghapus tabel beserta data pengumumannya.
+
+`GET/POST /api/v1/announcements` dan `GET/PATCH/DELETE
+/api/v1/announcements/:id` tersedia untuk owner serta operator dengan permission
+`announcements`. Owner wajib memilih bimbel melalui header `X-Tenant-Id`.
+Daftar menerima `search` (judul), `targetRole`, `page`, dan `limit`.
+
+Body create berisi `title` (1–150 karakter), `content` (teks biasa, 1–10.000
+karakter), `targetRole` (`all`, `admin`, `tutor`, atau `parent`), serta
+`startsAt`/`endsAt` opsional. Timestamp harus berupa ISO 8601 dengan zona waktu,
+contohnya `2026-10-27T08:00:00+07:00`. API menormalisasi jadwal menjadi string
+UTC kanonis; kolom `char(24)` menjaga jadwal tidak berubah mengikuti zona waktu
+driver MySQL. Form dan tampilan frontend menggunakan WIB.
+
+PATCH mempertahankan field yang tidak dikirim; `null` mengosongkan tanggal.
+Tanpa tanggal mulai statusnya Draft. Pengumuman menjadi Terjadwal sebelum
+tanggal mulai, Aktif mulai tanggal tersebut, dan Berakhir tepat saat tanggal
+akhir. Tanggal akhir opsional dan harus lebih besar daripada tanggal mulai.
+Status dihitung saat request tanpa cron.
+
+`GET /api/v1/announcements/active` mengembalikan pagination pengumuman aktif
+untuk role dan tenant pengguna, termasuk target `all`, diurutkan dari waktu
+mulai terbaru. Admin berarti owner/operator; `parent` berarti Siswa/Wali.
+Endpoint ini tidak memerlukan permission pengelolaan. Tampilan penerima saat
+ini tersedia di dashboard admin/tentor; tampilan wali ditunda.
+
+Untuk memverifikasi migration naik/turun/naik, foreign key, dan constraint
+tanggal pada database sementara yang otomatis dihapus:
+
+```bash
+node --loader ts-node/esm scripts/verify-announcements-migration.mjs
+```

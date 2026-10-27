@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AnnouncementsModule } from './announcements/announcements.module.js';
 import { ConfigModule, ConfigType } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
@@ -49,6 +50,7 @@ import { UsersModule } from './users/users.module.js';
       }),
     }),
     AuthModule,
+    AnnouncementsModule,
     OwnersModule,
     OperatorsModule,
     TenantsModule,

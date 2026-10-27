@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { CreateAnnouncements20261027200000 } from '../src/database/migrations/20261027200000-CreateAnnouncements.js';
 import mysql from 'mysql2/promise';
 import { DataSource } from 'typeorm';
 import { CreateCoreIdentitySchema20260926000000 } from '../src/database/migrations/20260926000000-CreateCoreIdentitySchema.js';
@@ -54,6 +55,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
         CreateRoomsAndAssignSchedules20261026000000,
         CreateDatedSessions20261027000000,
         AddOperatorMenuPermissions20261027100000,
+        CreateAnnouncements20261027200000,
       ],
       synchronize: false,
       migrationsRun: false,
