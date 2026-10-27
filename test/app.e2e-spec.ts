@@ -40,7 +40,7 @@ interface SeedIds {
 }
 
 const password = 'StrongPassword!123';
-const changedPassword = 'ChangedPassword!456';
+const changedPassword = 'abc12';
 const adminRootPath = process.env.ADMIN_ROOT_PATH ?? '/backend-admin';
 
 describe('AppController (e2e)', () => {
