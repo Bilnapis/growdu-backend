@@ -447,6 +447,105 @@ describe('AppController (e2e)', () => {
       });
   });
 
+  it('allows tutors to update only their own personal fields and synchronizes login email atomically', async () => {
+    const tutor = sessions.get(UserRole.Tutor);
+    const parent = sessions.get(UserRole.Parent);
+    const operator = sessions.get(UserRole.Operator);
+    if (!tutor || !parent || !operator) throw new Error('Missing session');
+    const original = await dataSource.manager.findOneByOrFail(TutorEntity, {
+      id: ids.tutorId,
+    });
+    const input = {
+      name: 'Updated Tutor',
+      phoneNumber: '',
+      email: 'updated-tutor@example.com',
+      address: 'Jl. Melati No. 12',
+      expertise: 'Matematika, Fisika',
+      education: 'Pendidikan Matematika',
+    };
+    const patchProfile = (token: string) =>
+      request(app.getHttpServer())
+        .patch('/api/v1/tutors/me')
+        .set('Authorization', `Bearer ${token}`);
+
+    await request(app.getHttpServer())
+      .patch('/api/v1/tutors/me')
+      .send(input)
+      .expect(401);
+    for (const session of [parent, operator]) {
+      await patchProfile(session.accessToken).send(input).expect(403);
+    }
+    for (const forbidden of [
+      { sessionRate: '999999.00' },
+      { status: 'inactive' },
+      { bankName: 'BCA' },
+      { password: 'NewPassword123' },
+      { id: ids.parentId },
+      { userId: ids.parentId },
+      { tenantId: ids.tenantId },
+    ]) {
+      await patchProfile(tutor.accessToken)
+        .send({ ...input, ...forbidden })
+        .expect(400);
+    }
+    await patchProfile(tutor.accessToken)
+      .send({ ...input, email: 'invalid' })
+      .expect(400);
+    await patchProfile(tutor.accessToken)
+      .send({ ...input, name: ' ' })
+      .expect(400);
+    await patchProfile(tutor.accessToken)
+      .send({ ...input, phoneNumber: null })
+      .expect(400);
+    await patchProfile(tutor.accessToken)
+      .send({ ...input, email: 'owner@example.com' })
+      .expect(409);
+    const unchanged = await dataSource.manager.findOneByOrFail(TutorEntity, {
+      id: ids.tutorId,
+    });
+    expect(unchanged.name).toBe(original.name);
+    expect(unchanged.email).toBe(original.email);
+
+    try {
+      await patchProfile(tutor.accessToken)
+        .send(input)
+        .expect(200)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            ...input,
+            id: ids.tutorId,
+            sessionRate: original.sessionRate,
+            status: original.status,
+          });
+          expect(body).not.toHaveProperty('passwordHash');
+        });
+      await request(app.getHttpServer())
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${tutor.accessToken}`)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            email: input.email,
+            profileName: input.name,
+          }),
+        );
+    } finally {
+      await dataSource.manager.update(TutorEntity, original.id, {
+        name: original.name,
+        phoneNumber: original.phoneNumber,
+        email: original.email,
+        address: original.address,
+        expertise: original.expertise,
+        education: original.education,
+      });
+      if (original.userId) {
+        await dataSource.manager.update(UserEntity, original.userId, {
+          email: 'tutor@example.com',
+        });
+      }
+    }
+  });
+
   it('returns 404 for a record owned by another tenant', async () => {
     const owner = sessions.get(UserRole.Owner);
     if (!owner) throw new Error('Missing owner session');

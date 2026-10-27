@@ -23,6 +23,7 @@ import {
 import { TutorResponseDto } from './dto/tutor-response.dto.js';
 import { TutorEntity } from './entities/tutor.entity.js';
 import { TutorsRepository } from './repositories/tutors.repository.js';
+import { UpdateTutorProfileDto } from './dto/update-tutor-profile.dto.js';
 
 @Injectable()
 export class TutorsService {
@@ -96,6 +97,22 @@ export class TutorsService {
       throw new NotFoundException('Tutor profile not found');
     }
     return TutorResponseDto.fromEntity(tutor);
+  }
+
+  async updateMe(
+    tenantId: string,
+    userId: string,
+    dto: UpdateTutorProfileDto,
+  ): Promise<TutorResponseDto> {
+    const tutor = await this.findMe(tenantId, userId);
+    return this.update(tenantId, tutor.id, {
+      name: dto.name,
+      phoneNumber: dto.phoneNumber,
+      email: dto.email,
+      address: dto.address,
+      expertise: dto.expertise,
+      education: dto.education,
+    });
   }
 
   async create(
