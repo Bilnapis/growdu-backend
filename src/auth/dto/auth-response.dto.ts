@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
 import { UserRole } from '../../users/entities/user.entity.js';
+import { OperatorMenu } from '../../operators/menu-permissions.js';
 
 export class AuthUserResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -26,6 +27,9 @@ export class AuthUserResponseDto {
 
   @ApiPropertyOptional({ nullable: true })
   profileName: string | null;
+
+  @ApiProperty({ enum: OperatorMenu, isArray: true, nullable: true })
+  menuPermissions: OperatorMenu[] | null;
 }
 
 export class TokenResponseDto {

@@ -196,4 +196,30 @@ satu transaksi. Password hanya disimpan sebagai hash dan tidak dikembalikan.
 Jalankan `npm run migration:run` untuk menerapkan migration
 `20261024000000-AddOperatorAddress` sebelum memakai form pegawai. Kolom alamat
 bersifat nullable sehingga data lama tetap valid. Rollback migration menghapus
-kolom alamat beserta isinya. Hak akses per menu belum menjadi bagian fitur ini.
+kolom alamat beserta isinya.
+
+Pembuatan akun menerima `menuPermissions` opsional berupa array ID menu unik:
+`dashboard`, `students`, `tutors`, `study-groups`, `schedule`, `rooms`,
+`invoices`, `payroll`, `reports`, `announcements`, dan `settings`.
+Jika tidak dikirim, akses operasional lama tetap berlaku. Array kosong `[]`
+berarti akun dapat login tanpa akses menu operasional. Pilihan akses dan akun
+disimpan dalam transaksi yang sama.
+
+Owner dapat mengganti seluruh akses melalui
+`PUT /api/v1/tenants/:tenantId/operators/:id/menu-permissions` dengan body
+`{ "menuPermissions": ["students", "schedule"] }`. Endpoint memverifikasi
+kepemilikan bimbel dan keanggotaan pegawai; pegawai tidak dapat mengubah izin
+sendiri. Perubahan berlaku pada request API berikutnya, termasuk sesi yang masih
+aktif. Response pegawai dan `/auth/me` menyertakan `menuPermissions`; navigasi
+pegawai memperbarui izin setiap 30 detik. Menu Pengaturan tidak memberikan akses
+ke pengelolaan user atau pegawai yang tetap khusus owner.
+
+Modal ubah pegawai mengirim data akun dan `menuPermissions` melalui
+`PATCH /api/v1/tenants/:tenantId/operators/:id`. Keduanya disimpan dalam satu
+transaksi; jika email bentrok, seluruh perubahan dibatalkan. Jika
+`menuPermissions` tidak dikirim, akses sebelumnya tetap dipertahankan.
+
+Jalankan `npm run migration:run` untuk menerapkan
+`20261027100000-AddOperatorMenuPermissions` sebelum memakai fitur hak akses.
+Kolom JSON nullable mempertahankan akses akun lama. Rollback menghapus kolom
+beserta pengaturan aksesnya.

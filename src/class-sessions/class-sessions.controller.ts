@@ -28,6 +28,9 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { TenantScoped } from '../auth/decorators/tenant-scoped.decorator.js';
+import { RequireMenuAccess } from '../auth/decorators/require-menu-access.decorator.js';
+import { OperatorMenu } from '../operators/menu-permissions.js';
+import { SchedulingOptionsDto } from './dto/scheduling-options.dto.js';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type.js';
 import { UserRole } from '../users/entities/user.entity.js';
 import { ClassSessionsService } from './class-sessions.service.js';
@@ -44,6 +47,7 @@ import {
 @TenantScoped()
 @Roles(UserRole.Owner, UserRole.Operator, UserRole.Tutor)
 @Controller('class-sessions')
+@RequireMenuAccess(OperatorMenu.Schedule)
 @ApiForbiddenResponse({
   description: 'Role or session assignment does not permit access',
 })
@@ -55,6 +59,13 @@ import {
 })
 export class ClassSessionsController {
   constructor(private readonly service: ClassSessionsService) {}
+  @Get('form-options')
+  @Roles(UserRole.Owner, UserRole.Operator)
+  @ApiOperation({ summary: 'Get active tutor and room choices for rescheduling' })
+  @ApiOkResponse({ type: SchedulingOptionsDto })
+  formOptions(@CurrentUser() user: AuthenticatedUser): Promise<SchedulingOptionsDto> {
+    return this.service.getSchedulingOptions(user.tenantId);
+  }
   @Get()
   @ApiOperation({ summary: 'List dated sessions assigned to the current user' })
   @ApiOkResponse({ type: SessionPageResponseDto })
@@ -104,6 +115,7 @@ export class ClassSessionsController {
 @TenantScoped()
 @Roles(UserRole.Owner, UserRole.Operator)
 @Controller('study-groups/:id/configurations')
+@RequireMenuAccess(OperatorMenu.StudyGroups)
 export class ConfigurationsController {
   constructor(private readonly service: ConfigurationsService) {}
   @Get() history(

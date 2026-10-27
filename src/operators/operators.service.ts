@@ -22,6 +22,7 @@ import {
 import { OperatorResponseDto } from './dto/operator-response.dto.js';
 import { OperatorEntity } from './entities/operator.entity.js';
 import { OperatorsRepository } from './repositories/operators.repository.js';
+import { UpdateOperatorMenuPermissionsDto } from './dto/operator-menu-permissions.dto.js';
 
 @Injectable()
 export class OperatorsService {
@@ -88,6 +89,7 @@ export class OperatorsService {
           name: dto.name,
           address: dto.address?.trim() || null,
           phoneNumber: dto.phoneNumber,
+          menuPermissions: dto.menuPermissions ?? null,
           status,
         });
         const savedOperator = await manager.save(operator);
@@ -123,6 +125,8 @@ export class OperatorsService {
           operator.address = dto.address?.trim() || null;
         if (dto.phoneNumber !== undefined)
           operator.phoneNumber = dto.phoneNumber;
+        if (dto.menuPermissions !== undefined)
+          operator.menuPermissions = [...dto.menuPermissions];
         if (dto.status !== undefined) {
           operator.status = dto.status;
           operator.user.status = dto.status;
@@ -173,6 +177,25 @@ export class OperatorsService {
       if (!operator) throw new NotFoundException('Operator not found');
       await manager.delete(OperatorEntity, { id: operator.id });
       await manager.delete(UserEntity, { id: operator.userId });
+    });
+  }
+
+  async updateMenuPermissions(
+    ownerUserId: string,
+    tenantId: string,
+    id: string,
+    dto: UpdateOperatorMenuPermissionsDto,
+  ): Promise<OperatorResponseDto> {
+    await this.ownersService.assertOwnsTenant(ownerUserId, tenantId);
+    return this.dataSource.transaction(async (manager) => {
+      const operator = await manager.findOne(OperatorEntity, {
+        where: { id, tenantId },
+        relations: { user: true },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!operator) throw new NotFoundException('Operator not found');
+      operator.menuPermissions = [...dto.menuPermissions];
+      return OperatorResponseDto.fromEntity(await manager.save(operator));
     });
   }
 

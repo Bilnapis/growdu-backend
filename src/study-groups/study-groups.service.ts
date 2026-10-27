@@ -25,6 +25,8 @@ import {
 import { StudyGroupScheduleEntity } from './entities/study-group-schedule.entity.js';
 import { StudyGroupStudentEntity } from './entities/study-group-student.entity.js';
 import { StudyGroupEntity } from './entities/study-group.entity.js';
+import { StudentEntity } from '../students/entities/student.entity.js';
+import { StudyGroupFormOptionsDto, StudyGroupStudentOptionDto } from './dto/study-group-options.dto.js';
 
 @Injectable()
 export class StudyGroupsService {
@@ -33,6 +35,37 @@ export class StudyGroupsService {
     private readonly configurations: ConfigurationsService,
     private readonly sessions: ClassSessionsService,
   ) {}
+
+  async getFormOptions(tenantId: string): Promise<StudyGroupFormOptionsDto> {
+    const [scheduling, students] = await Promise.all([
+      this.sessions.getSchedulingOptions(tenantId),
+      this.dataSource.manager.find(StudentEntity, {
+        where: { tenantId, status: EntityStatus.Active },
+        select: { id: true, name: true, educationLevel: true, school: true, address: true, status: true },
+        order: { name: 'ASC' },
+        take: 100,
+      }),
+    ]);
+    return {
+      ...scheduling,
+      students: students.map(({ id, name, educationLevel, school, address, status }) => ({
+        id, name, educationLevel, school, address, status,
+      })),
+    };
+  }
+
+  async getStudents(tenantId: string, id: string): Promise<StudyGroupStudentOptionDto[]> {
+    const group = await this.findOne(tenantId, id);
+    if (group.studentIds.length === 0) return [];
+    const students = await this.dataSource.manager.find(StudentEntity, {
+      where: { tenantId, id: In(group.studentIds) },
+      select: { id: true, name: true, educationLevel: true, school: true, status: true },
+      order: { name: 'ASC' },
+    });
+    return students.map(({ id: studentId, name, educationLevel, school, status }) => ({
+      id: studentId, name, educationLevel, school, status,
+    }));
+  }
   async findAll(
     tenantId: string,
     query: StudyGroupsQueryDto,

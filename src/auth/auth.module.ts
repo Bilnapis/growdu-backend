@@ -20,6 +20,7 @@ import { AllowedOriginGuard } from './guards/allowed-origin.guard.js';
 import { AuthThrottlerGuard } from './guards/auth-throttler.guard.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { RolesGuard } from './guards/roles.guard.js';
+import { MenuAccessGuard } from './guards/menu-access.guard.js';
 import { TenantContextGuard } from './guards/tenant-context.guard.js';
 import { JwtStrategy } from './jwt.strategy.js';
 import { AuthSessionsRepository } from './repositories/auth-sessions.repository.js';
@@ -60,6 +61,7 @@ import { AuthSessionsRepository } from './repositories/auth-sessions.repository.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: TenantContextGuard },
+    { provide: APP_GUARD, useClass: MenuAccessGuard },
   ],
   exports: [AllowedOriginGuard, AuthService, AuthThrottlerGuard],
 })

@@ -3,6 +3,8 @@ import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { TenantScoped } from '../auth/decorators/tenant-scoped.decorator.js';
+import { RequireMenuAccess } from '../auth/decorators/require-menu-access.decorator.js';
+import { OperatorMenu } from '../operators/menu-permissions.js';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type.js';
 import { PaginatedResponse } from '../common/dto/pagination-query.dto.js';
 import { ApiProtectedEndpointErrors } from '../common/swagger/api-error-responses.decorator.js';
@@ -21,6 +23,7 @@ import { SchedulesService } from './schedules.service.js';
 @Roles(UserRole.Owner, UserRole.Operator, UserRole.Tutor)
 @TenantScoped()
 @Controller('schedules')
+@RequireMenuAccess(OperatorMenu.Schedule)
 export class SchedulesController {
   constructor(private readonly schedulesService: SchedulesService) {}
 

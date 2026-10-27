@@ -1,15 +1,20 @@
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
   IsEmail,
   IsEnum,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
+import { OperatorMenu } from '../menu-permissions.js';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -18,6 +23,20 @@ const normalizeEmail = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().toLowerCase() : value;
 
 export class CreateOperatorDto {
+  @ApiPropertyOptional({
+    enum: OperatorMenu,
+    isArray: true,
+    description:
+      'Menu access for the new employee. Omit to retain default access to all menus; use [] to deny every menu.',
+    example: [OperatorMenu.Dashboard, OperatorMenu.Students],
+  })
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsArray()
+  @ArrayUnique()
+  @ArrayMaxSize(Object.values(OperatorMenu).length)
+  @IsEnum(OperatorMenu, { each: true })
+  menuPermissions?: OperatorMenu[];
+
   @ApiPropertyOptional({ maxLength: 1000 })
   @IsOptional()
   @Transform(trim)
@@ -58,6 +77,19 @@ export class CreateOperatorDto {
 }
 
 export class UpdateOperatorDto {
+  @ApiPropertyOptional({
+    enum: OperatorMenu,
+    isArray: true,
+    description:
+      'Replaces menu access with the account update. Omit to keep existing access; use [] to deny every menu.',
+  })
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsArray()
+  @ArrayUnique()
+  @ArrayMaxSize(Object.values(OperatorMenu).length)
+  @IsEnum(OperatorMenu, { each: true })
+  menuPermissions?: OperatorMenu[];
+
   @ApiPropertyOptional({ maxLength: 1000 })
   @IsOptional()
   @Transform(trim)

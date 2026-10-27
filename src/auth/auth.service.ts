@@ -9,6 +9,7 @@ import { PasswordHashService } from '../common/security/password-hash.service.js
 import authConfig from '../config/auth.config.js';
 import { ParentEntity } from '../parents/entities/parent.entity.js';
 import { OperatorEntity } from '../operators/entities/operator.entity.js';
+import { getOperatorMenuPermissions, OperatorMenu } from '../operators/menu-permissions.js';
 import { OwnerEntity } from '../owners/entities/owner.entity.js';
 import { TutorEntity } from '../tutors/entities/tutor.entity.js';
 import { UserEntity, UserRole } from '../users/entities/user.entity.js';
@@ -30,6 +31,7 @@ export interface AuthResult {
 interface ProfileSummary {
   id: string;
   name: string;
+  menuPermissions?: OperatorMenu[];
 }
 
 @Injectable()
@@ -205,13 +207,14 @@ export class AuthService {
     ) {
       throw this.invalidSession();
     }
-    await this.assertAccountActive(user);
+    const profile = await this.assertAccountActive(user);
     return {
       id: user.id,
       sessionId: session.id,
       tenantId: user.tenantId ?? '',
       email: user.email,
       role: user.role,
+      menuPermissions: profile?.menuPermissions,
     };
   }
 
@@ -258,6 +261,7 @@ export class AuthService {
       tenantName: user.tenant?.name ?? null,
       profileId: profile?.id ?? null,
       profileName: profile?.name ?? null,
+      menuPermissions: profile?.menuPermissions ?? null,
     };
   }
 
@@ -294,7 +298,11 @@ export class AuthService {
         },
       });
       if (!operator) throw this.invalidCredentials();
-      return { id: operator.id, name: operator.name };
+      return {
+        id: operator.id,
+        name: operator.name,
+        menuPermissions: getOperatorMenuPermissions(operator.menuPermissions),
+      };
     }
 
     if (user.role === UserRole.Tutor) {

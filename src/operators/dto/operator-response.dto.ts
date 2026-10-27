@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
 import { OperatorEntity } from '../entities/operator.entity.js';
+import { getOperatorMenuPermissions, OperatorMenu } from '../menu-permissions.js';
 
 export class OperatorResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -27,6 +28,9 @@ export class OperatorResponseDto {
   @ApiProperty({ enum: EntityStatus })
   status: EntityStatus;
 
+  @ApiProperty({ enum: OperatorMenu, isArray: true })
+  menuPermissions: OperatorMenu[];
+
   @ApiProperty({ format: 'date-time' })
   createdAt: Date;
 
@@ -43,6 +47,7 @@ export class OperatorResponseDto {
       phoneNumber: entity.phoneNumber,
       email: entity.user.email,
       status: entity.status,
+      menuPermissions: getOperatorMenuPermissions(entity.menuPermissions),
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     };

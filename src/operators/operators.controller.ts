@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import {
@@ -16,6 +17,7 @@ import {
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
@@ -32,6 +34,7 @@ import {
   UpdateOperatorDto,
 } from './dto/operator-input.dto.js';
 import { OperatorResponseDto } from './dto/operator-response.dto.js';
+import { UpdateOperatorMenuPermissionsDto } from './dto/operator-menu-permissions.dto.js';
 
 @ApiTags('Operators')
 @ApiBearerAuth()
@@ -80,6 +83,18 @@ export class OperatorsController {
     @Body() dto: UpdateOperatorDto,
   ): Promise<OperatorResponseDto> {
     return this.operatorsService.update(user.id, tenantId, id, dto);
+  }
+
+  @Put(':id/menu-permissions')
+  @ApiOperation({ summary: 'Replace employee menu access (owner only)' })
+  @ApiOkResponse({ type: OperatorResponseDto })
+  updateMenuPermissions(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateOperatorMenuPermissionsDto,
+  ): Promise<OperatorResponseDto> {
+    return this.operatorsService.updateMenuPermissions(user.id, tenantId, id, dto);
   }
 
   @Delete(':id')

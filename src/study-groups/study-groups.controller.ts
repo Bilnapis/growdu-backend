@@ -18,6 +18,8 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { TenantScoped } from '../auth/decorators/tenant-scoped.decorator.js';
+import { RequireMenuAccess } from '../auth/decorators/require-menu-access.decorator.js';
+import { OperatorMenu } from '../operators/menu-permissions.js';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type.js';
 import { PaginatedResponse } from '../common/dto/pagination-query.dto.js';
 import { ApiPaginatedResponse } from '../common/swagger/api-paginated-response.decorator.js';
@@ -35,6 +37,7 @@ import {
   StudyGroupsSummaryResponseDto,
 } from './dto/study-group-response.dto.js';
 import { StudyGroupsService } from './study-groups.service.js';
+import { StudyGroupFormOptionsDto, StudyGroupStudentOptionDto } from './dto/study-group-options.dto.js';
 
 @ApiTags('Study groups')
 @ApiBearerAuth()
@@ -42,8 +45,23 @@ import { StudyGroupsService } from './study-groups.service.js';
 @Roles(UserRole.Owner, UserRole.Operator)
 @TenantScoped()
 @Controller('study-groups')
+@RequireMenuAccess(OperatorMenu.StudyGroups)
 export class StudyGroupsController {
   constructor(private readonly studyGroupsService: StudyGroupsService) {}
+  @Get('form-options')
+  @ApiOkResponse({ type: StudyGroupFormOptionsDto })
+  formOptions(@CurrentUser() user: AuthenticatedUser): Promise<StudyGroupFormOptionsDto> {
+    return this.studyGroupsService.getFormOptions(user.tenantId);
+  }
+
+  @Get(':id/students')
+  @ApiOkResponse({ type: [StudyGroupStudentOptionDto] })
+  students(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<StudyGroupStudentOptionDto[]> {
+    return this.studyGroupsService.getStudents(user.tenantId, id);
+  }
   @Get()
   @ApiPaginatedResponse(StudyGroupListItemResponseDto)
   findAll(

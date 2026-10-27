@@ -42,6 +42,10 @@ describe('CreateOperatorDto', () => {
     ['email', 'invalid'],
     ['password', '1234'],
     ['password', 'a'.repeat(129)],
+    ['menuPermissions', null],
+    ['menuPermissions', 'dashboard'],
+    ['menuPermissions', ['staff']],
+    ['menuPermissions', ['dashboard', 'dashboard']],
   ])('rejects invalid %s', async (field, value) => {
     const dto = plainToInstance(CreateOperatorDto, {
       ...validInput,

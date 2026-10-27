@@ -10,6 +10,8 @@ import { OwnerEntity } from '../src/owners/entities/owner.entity.js';
 import { TenantEntity } from '../src/tenants/entities/tenant.entity.js';
 import { UserEntity, UserRole } from '../src/users/entities/user.entity.js';
 import { OperatorEntity } from '../src/operators/entities/operator.entity.js';
+import { OperatorMenu } from '../src/operators/menu-permissions.js';
+import { RoomEntity } from '../src/rooms/entities/room.entity.js';
 
 const password = 'abc12';
 const staffInput = {
@@ -18,6 +20,7 @@ const staffInput = {
   email: 'staff-e2e@example.com',
   password,
   address: 'Jl. Melati 12',
+  menuPermissions: [OperatorMenu.Students, OperatorMenu.Schedule],
 };
 
 describe('Staff operator API (e2e)', () => {
@@ -127,6 +130,7 @@ describe('Staff operator API (e2e)', () => {
       email: staffInput.email,
       status: 'active',
       tenantId,
+      menuPermissions: staffInput.menuPermissions,
     });
     expect(response.body).not.toHaveProperty('password');
     expect(response.body).not.toHaveProperty('passwordHash');
@@ -135,6 +139,7 @@ describe('Staff operator API (e2e)', () => {
       .findOneByOrFail({ tenantId, name: staffInput.name });
     operatorId = operator.id;
     expect(operator.address).toBe(staffInput.address);
+    expect(operator.menuPermissions).toEqual(staffInput.menuPermissions);
     const user = await dataSource
       .getRepository(UserEntity)
       .createQueryBuilder('user')
@@ -176,5 +181,271 @@ describe('Staff operator API (e2e)', () => {
       .auth(token, { type: 'bearer' })
       .send({ ...staffInput, email: 'forbidden@example.com' })
       .expect(403);
+    await request(app.getHttpServer())
+      .put(
+        `/api/v1/tenants/${tenantId}/operators/${operatorId}/menu-permissions`,
+      )
+      .auth(token, { type: 'bearer' })
+      .send({ menuPermissions: Object.values(OperatorMenu) })
+      .expect(403);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tenants/${tenantId}/operators/${operatorId}`)
+      .auth(token, { type: 'bearer' })
+      .send({
+        name: 'Unauthorized',
+        menuPermissions: Object.values(OperatorMenu),
+      })
+      .expect(403);
+  });
+
+  it('protects permission updates by authentication, ownership, and tenant membership', async () => {
+    const path = `/api/v1/tenants/${tenantId}/operators/${operatorId}/menu-permissions`;
+    await request(app.getHttpServer())
+      .put(path)
+      .send({ menuPermissions: [] })
+      .expect(401);
+    const otherOwnerToken = await login('staff-other-owner@example.com');
+    await request(app.getHttpServer())
+      .put(path)
+      .auth(otherOwnerToken, { type: 'bearer' })
+      .send({ menuPermissions: [] })
+      .expect(403);
+    await request(app.getHttpServer())
+      .put(
+        `/api/v1/tenants/${otherTenantId}/operators/${operatorId}/menu-permissions`,
+      )
+      .auth(otherOwnerToken, { type: 'bearer' })
+      .send({ menuPermissions: [] })
+      .expect(404);
+  });
+
+  it.each([
+    {},
+    { menuPermissions: null },
+    { menuPermissions: ['staff'] },
+    { menuPermissions: ['students', 'students'] },
+    { menuPermissions: [], role: 'owner' },
+  ])(
+    'rejects invalid permission updates without changing access: %j',
+    async (input) => {
+      await request(app.getHttpServer())
+        .put(
+          `/api/v1/tenants/${tenantId}/operators/${operatorId}/menu-permissions`,
+        )
+        .auth(ownerToken, { type: 'bearer' })
+        .send(input)
+        .expect(400);
+      const operator = await dataSource
+        .getRepository(OperatorEntity)
+        .findOneByOrFail({ id: operatorId });
+      expect(operator.menuPermissions).toEqual(staffInput.menuPermissions);
+    },
+  );
+
+  it('applies granted and revoked access immediately to the same active login', async () => {
+    const token = await login(staffInput.email);
+    const path = `/api/v1/tenants/${tenantId}/operators/${operatorId}/menu-permissions`;
+    await request(app.getHttpServer())
+      .get('/api/v1/students')
+      .auth(token, { type: 'bearer' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/rooms')
+      .auth(token, { type: 'bearer' })
+      .expect(403);
+
+    const updated = await request(app.getHttpServer())
+      .put(path)
+      .auth(ownerToken, { type: 'bearer' })
+      .send({ menuPermissions: [OperatorMenu.Rooms] })
+      .expect(200);
+    expect(updated.body).toMatchObject({
+      id: operatorId,
+      menuPermissions: [OperatorMenu.Rooms],
+    });
+    expect(updated.body).not.toHaveProperty('passwordHash');
+    await request(app.getHttpServer())
+      .get('/api/v1/students')
+      .auth(token, { type: 'bearer' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/api/v1/rooms')
+      .auth(token, { type: 'bearer' })
+      .expect(200);
+    const me = await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .auth(token, { type: 'bearer' })
+      .expect(200);
+    expect(me.body.menuPermissions).toEqual([OperatorMenu.Rooms]);
+
+    await request(app.getHttpServer())
+      .put(path)
+      .auth(ownerToken, { type: 'bearer' })
+      .send({ menuPermissions: [] })
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/rooms')
+      .auth(token, { type: 'bearer' })
+      .expect(403);
+    const withoutAccess = await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .auth(token, { type: 'bearer' })
+      .expect(200);
+    expect(withoutAccess.body.menuPermissions).toEqual([]);
+
+    // Menu permissions do not change the owner's access to tenant data.
+    await request(app.getHttpServer())
+      .get('/api/v1/rooms')
+      .set('X-Tenant-Id', tenantId)
+      .auth(ownerToken, { type: 'bearer' })
+      .expect(200);
+  });
+
+  it('keeps scheduling and group pickers usable without granting access to other menus', async () => {
+    const room = await dataSource.getRepository(RoomEntity).save({
+      tenantId,
+      name: 'Ruang A',
+      code: 'A',
+      capacity: 12,
+      status: EntityStatus.Active,
+    });
+    const token = await login(staffInput.email);
+    const path = `/api/v1/tenants/${tenantId}/operators/${operatorId}/menu-permissions`;
+    await request(app.getHttpServer())
+      .put(path)
+      .auth(ownerToken, { type: 'bearer' })
+      .send({ menuPermissions: [OperatorMenu.Schedule] })
+      .expect(200);
+    const options = await request(app.getHttpServer())
+      .get('/api/v1/class-sessions/form-options')
+      .auth(token, { type: 'bearer' })
+      .expect(200);
+    expect(options.body).toEqual({
+      tutors: [],
+      rooms: [{ id: room.id, name: room.name, code: room.code, capacity: 12 }],
+    });
+    await request(app.getHttpServer())
+      .get('/api/v1/rooms')
+      .auth(token, { type: 'bearer' })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .put(path)
+      .auth(ownerToken, { type: 'bearer' })
+      .send({ menuPermissions: [OperatorMenu.StudyGroups] })
+      .expect(200);
+    const groupOptions = await request(app.getHttpServer())
+      .get('/api/v1/study-groups/form-options')
+      .auth(token, { type: 'bearer' })
+      .expect(200);
+    expect(groupOptions.body).toEqual({ ...options.body, students: [] });
+    for (const menuPath of [
+      '/students',
+      '/tutors',
+      '/rooms',
+      '/class-sessions/form-options',
+    ]) {
+      await request(app.getHttpServer())
+        .get(`/api/v1${menuPath}`)
+        .auth(token, { type: 'bearer' })
+        .expect(403);
+    }
+  });
+
+  it('creates accounts with no menu access and retains defaults for older clients', async () => {
+    const noAccess = await request(app.getHttpServer())
+      .post(`/api/v1/tenants/${tenantId}/operators`)
+      .auth(ownerToken, { type: 'bearer' })
+      .send({
+        ...staffInput,
+        email: 'no-menu@example.com',
+        menuPermissions: [],
+      })
+      .expect(201);
+    expect(noAccess.body.menuPermissions).toEqual([]);
+    const token = await login('no-menu@example.com');
+    await request(app.getHttpServer())
+      .get('/api/v1/students')
+      .auth(token, { type: 'bearer' })
+      .expect(403);
+
+    const { menuPermissions: _permissions, ...legacyInput } = staffInput;
+    const legacy = await request(app.getHttpServer())
+      .post(`/api/v1/tenants/${tenantId}/operators`)
+      .auth(ownerToken, { type: 'bearer' })
+      .send({ ...legacyInput, email: 'legacy-menu@example.com' })
+      .expect(201);
+    expect(legacy.body.menuPermissions).toEqual(Object.values(OperatorMenu));
+  });
+  it('updates account data and permissions together while preserving omitted permissions', async () => {
+    const token = await login(staffInput.email);
+    const path = `/api/v1/tenants/${tenantId}/operators/${operatorId}`;
+    const response = await request(app.getHttpServer())
+      .patch(path)
+      .auth(ownerToken, { type: 'bearer' })
+      .send({
+        name: 'Pegawai Diperbarui',
+        address: 'Jl. Baru 10',
+        menuPermissions: [OperatorMenu.Rooms],
+      })
+      .expect(200);
+    expect(response.body).toMatchObject({
+      id: operatorId,
+      name: 'Pegawai Diperbarui',
+      address: 'Jl. Baru 10',
+      menuPermissions: [OperatorMenu.Rooms],
+    });
+    expect(response.body).not.toHaveProperty('passwordHash');
+    await request(app.getHttpServer())
+      .get('/api/v1/rooms')
+      .auth(token, { type: 'bearer' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/study-groups')
+      .auth(token, { type: 'bearer' })
+      .expect(403);
+
+    const profileOnly = await request(app.getHttpServer())
+      .patch(path)
+      .auth(ownerToken, { type: 'bearer' })
+      .send({ name: 'Hanya Profil' })
+      .expect(200);
+    expect(profileOnly.body.menuPermissions).toEqual([OperatorMenu.Rooms]);
+  });
+
+  it('rolls back account and permission changes together if the email conflicts', async () => {
+    const path = `/api/v1/tenants/${tenantId}/operators/${operatorId}`;
+    const before = await dataSource
+      .getRepository(OperatorEntity)
+      .findOneOrFail({
+        where: { id: operatorId },
+        relations: { user: true },
+      });
+    await request(app.getHttpServer())
+      .patch(path)
+      .auth(ownerToken, { type: 'bearer' })
+      .send({
+        name: 'Must Not Persist',
+        email: 'no-menu@example.com',
+        menuPermissions: [],
+      })
+      .expect(409);
+    const after = await dataSource.getRepository(OperatorEntity).findOneOrFail({
+      where: { id: operatorId },
+      relations: { user: true },
+    });
+    expect(after.name).toBe(before.name);
+    expect(after.user.email).toBe(before.user.email);
+    expect(after.menuPermissions).toEqual(before.menuPermissions);
+
+    const cleared = await request(app.getHttpServer())
+      .patch(path)
+      .auth(ownerToken, { type: 'bearer' })
+      .send({ menuPermissions: [] })
+      .expect(200);
+    expect(cleared.body).toMatchObject({
+      name: before.name,
+      menuPermissions: [],
+    });
   });
 });

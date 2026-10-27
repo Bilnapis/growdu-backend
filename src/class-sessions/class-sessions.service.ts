@@ -15,6 +15,7 @@ import { EntityStatus } from '../common/enums/entity-status.enum.js';
 import { createPaginationMeta } from '../common/dto/pagination-query.dto.js';
 import { ClassSessionEntity } from './entities/class-session.entity.js';
 import { ClassSessionStudentEntity } from './entities/class-session-student.entity.js';
+import { SchedulingOptionsDto } from './dto/scheduling-options.dto.js';
 import {
   SessionOverrideDto,
   SessionQueryDto,
@@ -24,6 +25,22 @@ import {
 @Injectable()
 export class ClassSessionsService {
   constructor(private readonly db: DataSource) {}
+
+  async getSchedulingOptions(tenantId: string): Promise<SchedulingOptionsDto> {
+    const where = { tenantId, status: EntityStatus.Active };
+    const [tutors, rooms] = await Promise.all([
+      this.db.manager.find(TutorEntity, {
+        where, select: { id: true, name: true }, order: { name: 'ASC' }, take: 100,
+      }),
+      this.db.manager.find(RoomEntity, {
+        where, select: { id: true, name: true, code: true, capacity: true }, order: { name: 'ASC' }, take: 100,
+      }),
+    ]);
+    return {
+      tutors: tutors.map(({ id, name }) => ({ id, name })),
+      rooms: rooms.map(({ id, name, code, capacity }) => ({ id, name, code, capacity })),
+    };
+  }
   async lockTenant(m: EntityManager, tenantId: string) {
     const tenant = await m.findOne(TenantEntity, {
       where: { id: tenantId },

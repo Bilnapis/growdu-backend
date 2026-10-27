@@ -12,6 +12,7 @@ import {
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
 import { TenantEntity } from '../../tenants/entities/tenant.entity.js';
 import { UserEntity } from '../../users/entities/user.entity.js';
+import { OperatorMenu } from '../menu-permissions.js';
 
 @Entity({ name: 'operators' })
 @Index('IDX_operators_tenant_id_status', ['tenantId', 'status'])
@@ -42,6 +43,9 @@ export class OperatorEntity {
 
   @Column({ type: 'varchar', length: 1000, nullable: true })
   address: string | null;
+
+  @Column({ name: 'menu_permissions', type: 'json', nullable: true })
+  menuPermissions: OperatorMenu[] | null;
 
   @Column({ type: 'enum', enum: EntityStatus, default: EntityStatus.Active })
   status: EntityStatus;
