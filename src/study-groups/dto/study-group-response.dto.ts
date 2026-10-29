@@ -29,6 +29,10 @@ export class StudyGroupResponseDto extends StudyGroupListItemResponseDto {
 }
 export class StudyGroupsSummaryResponseDto {
   @ApiProperty() total: number;
+  @ApiProperty({
+    description: 'Total groups registered before the start of the current month in Asia/Jakarta.',
+  })
+  previousMonthTotal: number;
   @ApiProperty() active: number;
   @ApiProperty() inactive: number;
   @ApiProperty() schedulesToday: number;

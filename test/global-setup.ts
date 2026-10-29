@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { CreateMetricStatusHistory20261029000000 } from '../src/database/migrations/20261029000000-CreateMetricStatusHistory.js';
 import { AddTenantSettings20261028000000 } from '../src/database/migrations/20261028000000-AddTenantSettings.js';
 import { CreateAnnouncements20261027200000 } from '../src/database/migrations/20261027200000-CreateAnnouncements.js';
 import mysql from 'mysql2/promise';
@@ -58,6 +59,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
         AddOperatorMenuPermissions20261027100000,
         CreateAnnouncements20261027200000,
         AddTenantSettings20261028000000,
+        CreateMetricStatusHistory20261029000000,
       ],
       synchronize: false,
       migrationsRun: false,

@@ -100,24 +100,34 @@ export class StudyGroupsService {
     return { data, meta: createPaginationMeta(query.page, query.limit, total) };
   }
   async getSummary(tenantId: string): Promise<StudyGroupsSummaryResponseDto> {
+    const today = jakartaDate();
+    const monthStart = new Date(`${today.slice(0, 7)}-01T00:00:00+07:00`);
     const raw = await this.dataSource
       .getRepository(StudyGroupEntity)
       .createQueryBuilder('group')
       .select('COUNT(*)', 'total')
+      .addSelect('SUM(group.created_at < :monthStart)', 'previousMonthTotal')
+      .setParameter('monthStart', monthStart)
       .addSelect("SUM(group.status = 'active')", 'active')
       .addSelect("SUM(group.status = 'inactive')", 'inactive')
       .where('group.tenant_id = :tenantId', { tenantId })
-      .getRawOne<{ total: string; active: string; inactive: string }>();
+      .getRawOne<{
+        total: string;
+        previousMonthTotal: string | null;
+        active: string;
+        inactive: string;
+      }>();
     const schedulesToday = await this.dataSource
       .getRepository(ClassSessionEntity)
       .createQueryBuilder('session')
       .where(
         'session.tenant_id = :tenantId AND session.session_date = :today AND session.status <> :cancelled',
-        { tenantId, today: jakartaDate(), cancelled: 'cancelled' },
+        { tenantId, today, cancelled: 'cancelled' },
       )
       .getCount();
     return {
       total: Number(raw?.total ?? 0),
+      previousMonthTotal: Number(raw?.previousMonthTotal ?? 0),
       active: Number(raw?.active ?? 0),
       inactive: Number(raw?.inactive ?? 0),
       schedulesToday,

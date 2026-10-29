@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { MetricsHistoryService } from '../metrics-history/metrics-history.service.js';
 import {
   createPaginationMeta,
   PaginatedResponse,
@@ -35,6 +36,7 @@ export class StudentsService {
   constructor(
     private readonly studentsRepository: StudentsRepository,
     private readonly dataSource: DataSource,
+    private readonly metricsHistory: MetricsHistoryService,
   ) {}
 
   async findAll(
@@ -67,8 +69,12 @@ export class StudentsService {
     };
   }
 
-  getSummary(tenantId: string): Promise<StudentsSummaryResponseDto> {
-    return this.studentsRepository.getSummary(tenantId);
+  async getSummary(tenantId: string): Promise<StudentsSummaryResponseDto> {
+    const [summary, previousMonthActive] = await Promise.all([
+      this.studentsRepository.getSummary(tenantId),
+      this.metricsHistory.getPreviousMonthActive(tenantId, 'student'),
+    ]);
+    return { ...summary, previousMonthActive };
   }
 
   async findOne(tenantId: string, id: string): Promise<StudentResponseDto> {

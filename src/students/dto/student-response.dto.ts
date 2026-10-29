@@ -102,6 +102,14 @@ export class StudentListItemResponseDto extends StudentResponseDto {
 }
 
 export class StudentsSummaryResponseDto {
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Active students at the end of the previous month in Asia/Jakarta, or null when history is unavailable.',
+  })
+  previousMonthActive: number | null;
+
   @ApiProperty()
   active: number;
 
@@ -112,8 +120,7 @@ export class StudentsSummaryResponseDto {
   missingParentContact: number;
 
   @ApiProperty({
-    description:
-      'Active students without membership in an active study group.',
+    description: 'Active students without membership in an active study group.',
   })
   withoutGroup: number;
 }

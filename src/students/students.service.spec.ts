@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import type { DataSource, EntityManager } from 'typeorm';
+import type { MetricsHistoryService } from '../metrics-history/metrics-history.service.js';
 import { EntityStatus } from '../common/enums/entity-status.enum.js';
 import { ParentEntity } from '../parents/entities/parent.entity.js';
 import { StudentsQueryDto } from './dto/student-input.dto.js';
@@ -57,6 +58,7 @@ describe('StudentsService', () => {
     const service = new StudentsService(
       repository,
       transactionDataSource({} as EntityManager),
+      {} as MetricsHistoryService,
     );
     const query = Object.assign(new StudentsQueryDto(), {
       page: 1,
@@ -93,6 +95,7 @@ describe('StudentsService', () => {
     const service = new StudentsService(
       {} as StudentsRepository,
       transactionDataSource(manager),
+      {} as MetricsHistoryService,
     );
 
     await expect(
@@ -151,6 +154,7 @@ describe('StudentsService', () => {
     const service = new StudentsService(
       {} as StudentsRepository,
       transactionDataSource(manager),
+      {} as MetricsHistoryService,
     );
 
     const result = await service.addParent('tenant-id', student.id, {

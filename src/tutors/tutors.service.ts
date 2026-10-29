@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { MetricsHistoryService } from '../metrics-history/metrics-history.service.js';
 import { AuthSessionEntity } from '../auth/entities/auth-session.entity.js';
 import { isDuplicateEntryError } from '../common/database/database-error.util.js';
 import {
@@ -20,7 +21,10 @@ import {
   TutorsQueryDto,
   UpdateTutorDto,
 } from './dto/tutor-input.dto.js';
-import { TutorResponseDto } from './dto/tutor-response.dto.js';
+import {
+  TutorResponseDto,
+  TutorsSummaryResponseDto,
+} from './dto/tutor-response.dto.js';
 import { TutorEntity } from './entities/tutor.entity.js';
 import { TutorsRepository } from './repositories/tutors.repository.js';
 import { UpdateTutorBankAccountDto } from './dto/update-tutor-bank-account.dto.js';
@@ -32,7 +36,19 @@ export class TutorsService {
     private readonly tutorsRepository: TutorsRepository,
     private readonly passwordHashService: PasswordHashService,
     private readonly dataSource: DataSource,
+    private readonly metricsHistory: MetricsHistoryService,
   ) {}
+
+  async getSummary(tenantId: string): Promise<TutorsSummaryResponseDto> {
+    const [active, previousMonthActive] = await Promise.all([
+      this.dataSource.getRepository(TutorEntity).countBy({
+        tenantId,
+        status: EntityStatus.Active,
+      }),
+      this.metricsHistory.getPreviousMonthActive(tenantId, 'tutor'),
+    ]);
+    return { active, previousMonthActive };
+  }
 
   async findAll(
     tenantId: string,

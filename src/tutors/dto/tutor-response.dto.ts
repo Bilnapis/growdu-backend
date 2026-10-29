@@ -2,6 +2,17 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EntityStatus } from '../../common/enums/entity-status.enum.js';
 import { TutorEntity } from '../entities/tutor.entity.js';
 
+export class TutorsSummaryResponseDto {
+  @ApiProperty() active: number;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Active tutors at the end of the previous month in Asia/Jakarta, or null when history is unavailable.',
+  })
+  previousMonthActive: number | null;
+}
+
 export class TutorResponseDto {
   @ApiProperty({ format: 'uuid' })
   id: string;

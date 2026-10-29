@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { MetricsHistoryModule } from '../metrics-history/metrics-history.module.js';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ParentEntity } from '../parents/entities/parent.entity.js';
 import { SecurityModule } from '../common/security/security.module.js';
@@ -20,6 +21,7 @@ import { TutorStudentsService } from './tutor-students.service.js';
       UserEntity,
     ]),
     SecurityModule,
+    MetricsHistoryModule,
   ],
   controllers: [StudentsController],
   providers: [

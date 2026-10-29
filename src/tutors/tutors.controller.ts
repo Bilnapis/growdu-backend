@@ -33,7 +33,10 @@ import {
   TutorsQueryDto,
   UpdateTutorDto,
 } from './dto/tutor-input.dto.js';
-import { TutorResponseDto } from './dto/tutor-response.dto.js';
+import {
+  TutorResponseDto,
+  TutorsSummaryResponseDto,
+} from './dto/tutor-response.dto.js';
 import { TutorsService } from './tutors.service.js';
 import { UpdateTutorProfileDto } from './dto/update-tutor-profile.dto.js';
 import { UpdateTutorBankAccountDto } from './dto/update-tutor-bank-account.dto.js';
@@ -91,6 +94,14 @@ export class TutorsController {
   @ApiOkResponse({ type: TutorFormOptionsDto })
   getFormOptions(): TutorFormOptionsDto {
     return this.tutorsService.getFormOptions();
+  }
+
+  @Get('summary')
+  @ApiOkResponse({ type: TutorsSummaryResponseDto })
+  getSummary(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<TutorsSummaryResponseDto> {
+    return this.tutorsService.getSummary(user.tenantId);
   }
 
   @Get(':id')

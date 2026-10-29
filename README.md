@@ -283,3 +283,37 @@ tanggal pada database sementara yang otomatis dihapus:
 ```bash
 node --loader ts-node/esm scripts/verify-announcements-migration.mjs
 ```
+
+### Perbandingan metrik dashboard
+
+Terapkan `20261029000000-CreateMetricStatusHistory` dengan
+`npm run migration:run` sebelum memakai perbandingan bulanan. Akun migration
+memerlukan privilege MySQL `TRIGGER`. Migration membuat tabel histori serta
+trigger pada siswa dan tentor untuk mencatat pembuatan, perubahan status,
+perpindahan bimbel, dan penghapusan dalam transaksi yang sama dengan data asal.
+Perubahan profil tanpa perubahan status tidak menambah histori.
+
+`GET /api/v1/students/summary` dan `GET /api/v1/tutors/summary` menyertakan
+`previousMonthActive`: jumlah aktif tepat sebelum awal bulan berjalan dalam WIB.
+Endpoint tentor mengikuti permission `tutors`; endpoint siswa mengikuti
+permission `students`. Semua hasil dibatasi pada bimbel yang dipilih.
+Siswa/tentor yang berubah status beberapa kali dihitung berdasarkan status
+terakhir sebelum batas bulan tersebut.
+
+Status awal data lama dicatat saat migration, bukan direkonstruksi ke masa lalu.
+`previousMonthActive` bernilai `null` hingga histori mencakup akhir bulan lalu;
+UI menampilkan “Data bulan lalu belum tersedia”. Rollback menghapus trigger dan
+histori, mempertahankan data siswa/tentor; riwayat yang dihapus tidak dapat
+dipulihkan dengan menjalankan migration kembali.
+
+Ringkasan kelompok menyertakan `previousMonthTotal`, dihitung dari tanggal
+pendaftaran sebelum awal bulan berjalan. Perbandingan Presensi Hari Ini memakai
+jumlah sesi dengan presensi tersimpan pada tanggal yang sama bulan lalu; jika
+tanggal itu tidak ada, digunakan hari terakhir bulan tersebut. Metrik keuangan
+dan laporan yang belum terintegrasi belum menyediakan pembanding bulanan.
+
+Verifikasi migration naik/turun/naik dengan database sementara:
+
+```bash
+node --loader ts-node/esm scripts/verify-metric-history-migration.mjs
+```
