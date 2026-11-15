@@ -37,6 +37,12 @@ export class StudentResponseDto {
   @ApiProperty({ enum: EntityStatus })
   status: EntityStatus;
 
+  @ApiProperty({ enum: EntityStatus })
+  administrativeStatus: EntityStatus;
+
+  @ApiProperty()
+  billingBlocked: boolean;
+
   @ApiProperty({ format: 'date-time' })
   createdAt: Date;
 
@@ -55,6 +61,8 @@ export class StudentResponseDto {
       phoneNumber: entity.phoneNumber,
       address: entity.address,
       status: entity.status,
+      administrativeStatus: entity.administrativeStatus,
+      billingBlocked: entity.billingBlocked,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     };

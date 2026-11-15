@@ -317,3 +317,7 @@ Verifikasi migration naik/turun/naik dengan database sementara:
 ```bash
 node --loader ts-node/esm scripts/verify-metric-history-migration.mjs
 ```
+## Invoice SPP
+
+Panduan setup, aturan pembayaran, default jatuh tempo tanggal 1/tenggang 0 hari,
+API, dan penyimpanan bukti privat tersedia di [docs/invoices.md](docs/invoices.md).

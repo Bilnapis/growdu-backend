@@ -22,6 +22,8 @@ import {
   StudentParentEntity,
 } from './entities/student-parent.entity.js';
 import { StudentEntity } from './entities/student.entity.js';
+import { setAdministrativeStatus } from './student-status.js';
+import { setStudentMonthlyFee } from './student-billing.js';
 
 @Injectable()
 export class StudentRegistrationService {
@@ -90,19 +92,20 @@ export class StudentRegistrationService {
           parent = existingParent;
         }
 
-        const student = await manager.save(
-          manager.create(StudentEntity, {
-            tenantId,
-            studentCode: `STD-${randomUUID().slice(0, 8).toUpperCase()}`,
-            name: dto.name.trim(),
-            gender: dto.gender,
-            educationLevel: dto.educationLevel.trim(),
-            school: dto.school.trim(),
-            phoneNumber: dto.phoneNumber?.trim() || null,
-            address: dto.address.trim(),
-            status: dto.status ?? EntityStatus.Active,
-          }),
-        );
+        const newStudent = manager.create(StudentEntity, {
+          tenantId,
+          studentCode: `STD-${randomUUID().slice(0, 8).toUpperCase()}`,
+          name: dto.name.trim(),
+          gender: dto.gender,
+          educationLevel: dto.educationLevel.trim(),
+          school: dto.school.trim(),
+          phoneNumber: dto.phoneNumber?.trim() || null,
+          address: dto.address.trim(),
+          status: dto.status ?? EntityStatus.Active,
+          administrativeStatus: dto.status ?? EntityStatus.Active,
+        });
+        setStudentMonthlyFee(newStudent, dto.monthlyFee ?? null);
+        const student = await manager.save(newStudent);
 
         await manager.save(
           manager.create(StudentParentEntity, {
@@ -158,7 +161,10 @@ export class StudentRegistrationService {
         if (!parent) throw new NotFoundException('Parent not found');
 
         const { parent: parentInput, ...studentInput } = dto;
-        Object.assign(student, studentInput);
+        const { status, monthlyFee, ...identity } = studentInput;
+        Object.assign(student, identity);
+        if (status !== undefined) setAdministrativeStatus(student, status);
+        if (monthlyFee !== undefined) setStudentMonthlyFee(student, monthlyFee);
         parent.name = parentInput.name;
         parent.phoneNumber = parentInput.phoneNumber;
         parent.contactEmail = parentInput.email;

@@ -5,9 +5,17 @@ export const environmentValidationSchema = Joi.object({
     .valid('development', 'test', 'production')
     .default('development'),
   PORT: Joi.number().port().default(3000),
-  PUBLIC_BASE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).default(
-    'http://localhost:3000',
-  ),
+  INVOICE_PROOF_STORAGE_PATH: Joi.string()
+    .trim()
+    .min(1)
+    .default('storage/invoice-proofs'),
+  INVOICE_AUTOMATION_ENABLED: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(true),
+  PUBLIC_BASE_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .default('http://localhost:3000'),
   API_PREFIX: Joi.string().trim().default('api/v1'),
   SWAGGER_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),
   SWAGGER_PATH: Joi.string()

@@ -30,6 +30,7 @@ import {
 import { StudentParentEntity } from './entities/student-parent.entity.js';
 import { StudentEntity } from './entities/student.entity.js';
 import { StudentsRepository } from './repositories/students.repository.js';
+import { setAdministrativeStatus } from './student-status.js';
 
 @Injectable()
 export class StudentsService {
@@ -95,6 +96,7 @@ export class StudentsService {
       phoneNumber: dto.phoneNumber ?? null,
       address: dto.address,
       status: dto.status ?? EntityStatus.Active,
+      administrativeStatus: dto.status ?? EntityStatus.Active,
     });
     try {
       return StudentResponseDto.fromEntity(
@@ -115,12 +117,18 @@ export class StudentsService {
     id: string,
     dto: UpdateStudentDto,
   ): Promise<StudentResponseDto> {
-    const student = await this.findEntity(tenantId, id);
-    Object.assign(student, dto);
     try {
-      return StudentResponseDto.fromEntity(
-        await this.studentsRepository.save(student),
-      );
+      return await this.dataSource.transaction(async (manager) => {
+        const student = await manager.findOne(StudentEntity, {
+          where: { id, tenantId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!student) throw new NotFoundException('Student not found');
+        const { status, ...identity } = dto;
+        Object.assign(student, identity);
+        if (status !== undefined) setAdministrativeStatus(student, status);
+        return StudentResponseDto.fromEntity(await manager.save(student));
+      });
     } catch (error: unknown) {
       if (isDuplicateEntryError(error)) {
         throw new ConflictException(

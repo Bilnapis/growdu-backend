@@ -2,11 +2,14 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsEmail,
   IsEnum,
+  IsInt,
   IsDefined,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  Max,
+  Min,
   MinLength,
   ValidateIf,
   ValidateNested,
@@ -56,6 +59,20 @@ export class NewStudentParentDto {
 }
 
 export class CreateStudentRegistrationDto {
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    minimum: 1,
+    maximum: 1_000_000_000,
+    description:
+      'Monthly SPP fee in whole rupiah; null or omitted leaves billing unconfigured.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1_000_000_000)
+  monthlyFee?: number | null;
+
   @ApiProperty({ minLength: 2, maxLength: 150 })
   @Transform(trim)
   @IsString()
@@ -156,6 +173,20 @@ export class UpdateRegisteredParentDto {
 }
 
 export class UpdateStudentRegistrationDto extends UpdateStudentDto {
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    minimum: 1,
+    maximum: 1_000_000_000,
+    description:
+      'Monthly SPP fee. Omit to preserve the current fee; null stops new invoices without clearing existing debts.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1_000_000_000)
+  monthlyFee?: number | null;
+
   @ApiProperty({ type: UpdateRegisteredParentDto })
   @IsDefined()
   @ValidateNested()

@@ -23,3 +23,6 @@ uploads/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Private invoice payment attachments
+storage/invoice-proofs/

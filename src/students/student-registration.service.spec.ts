@@ -1,4 +1,5 @@
 import type { DataSource, EntityManager, ObjectLiteral } from 'typeorm';
+import { nextBillingPeriod } from '../common/jakarta-date.js';
 import { EntityStatus } from '../common/enums/entity-status.enum.js';
 import type { PasswordHashService } from '../common/security/password-hash.service.js';
 import { ParentEntity } from '../parents/entities/parent.entity.js';
@@ -52,6 +53,7 @@ describe('StudentRegistrationService', () => {
       phoneNumber: '+6281234567890',
       address: 'Jl. Melati No. 12, Bandung',
       status: EntityStatus.Active,
+      monthlyFee: 450_000,
       parentSource: StudentParentSource.New,
       newParent: {
         name: 'Budi Santoso',
@@ -79,6 +81,8 @@ describe('StudentRegistrationService', () => {
       id: 'student-id',
       name: 'Nadia Putri',
       educationLevel: 'SMP Kelas 8',
+      monthlyFee: 450_000,
+      nextInvoicePeriod: nextBillingPeriod(),
     });
     expect(savedEntities[3]).toBeInstanceOf(StudentParentEntity);
     expect(savedEntities[3]).toMatchObject({

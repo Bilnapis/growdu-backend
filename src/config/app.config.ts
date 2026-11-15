@@ -12,5 +12,9 @@ export default registerAs('app', () => {
     apiPrefix: process.env.API_PREFIX ?? 'api/v1',
     swaggerEnabled: process.env.SWAGGER_ENABLED !== 'false',
     swaggerPath: process.env.SWAGGER_PATH ?? 'docs',
+    invoiceProofStoragePath:
+      process.env.INVOICE_PROOF_STORAGE_PATH ?? 'storage/invoice-proofs',
+    invoiceAutomationEnabled:
+      process.env.INVOICE_AUTOMATION_ENABLED !== 'false',
   };
 });

@@ -22,6 +22,7 @@ export enum StudentGender {
 })
 @Index('UQ_students_tenant_id_id', ['tenantId', 'id'], { unique: true })
 @Index('IDX_students_tenant_id_status', ['tenantId', 'status'])
+@Index('IDX_students_billing', ['tenantId', 'status', 'nextInvoicePeriod'])
 export class StudentEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -56,6 +57,28 @@ export class StudentEntity {
 
   @Column({ type: 'enum', enum: EntityStatus, default: EntityStatus.Active })
   status: EntityStatus;
+
+  @Column({
+    name: 'administrative_status',
+    type: 'enum',
+    enum: EntityStatus,
+    default: EntityStatus.Active,
+  })
+  administrativeStatus: EntityStatus;
+
+  @Column({ name: 'billing_blocked', type: 'boolean', default: false })
+  billingBlocked: boolean;
+
+  @Column({ name: 'monthly_fee', type: 'int', unsigned: true, nullable: true })
+  monthlyFee: number | null;
+
+  @Column({
+    name: 'next_invoice_period',
+    type: 'char',
+    length: 7,
+    nullable: true,
+  })
+  nextInvoicePeriod: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'datetime', precision: 6 })
   createdAt: Date;
