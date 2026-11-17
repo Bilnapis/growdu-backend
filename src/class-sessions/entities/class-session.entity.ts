@@ -2,6 +2,7 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('class_sessions')
 @Index(['tenantId', 'sessionDate'])
+@Index('UQ_sessions_tenant_id', ['tenantId', 'id'], { unique: true })
 export class ClassSessionEntity {
   @PrimaryGeneratedColumn('uuid') id: string;
   @Column({ name: 'tenant_id', type: 'char', length: 36 }) tenantId: string;

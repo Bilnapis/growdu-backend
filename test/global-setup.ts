@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { CreatePayroll20261116000000 } from '../src/database/migrations/20261116000000-CreatePayroll.js';
 import { CreateInvoices20261115000000 } from '../src/database/migrations/20261115000000-CreateInvoices.js';
 import { CreateMetricStatusHistory20261029000000 } from '../src/database/migrations/20261029000000-CreateMetricStatusHistory.js';
 import { AddTenantSettings20261028000000 } from '../src/database/migrations/20261028000000-AddTenantSettings.js';
@@ -62,6 +63,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
         AddTenantSettings20261028000000,
         CreateMetricStatusHistory20261029000000,
         CreateInvoices20261115000000,
+        CreatePayroll20261116000000,
       ],
       synchronize: false,
       migrationsRun: false,

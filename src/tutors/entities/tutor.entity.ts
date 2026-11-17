@@ -15,6 +15,7 @@ import { UserEntity } from '../../users/entities/user.entity.js';
 
 @Entity({ name: 'tutors' })
 @Index('IDX_tutors_tenant_id_status', ['tenantId', 'status'])
+@Index('UQ_tutors_tenant_id', ['tenantId', 'id'], { unique: true })
 export class TutorEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -55,10 +56,20 @@ export class TutorEntity {
   @Column({ name: 'bank_name', type: 'varchar', length: 100, nullable: true })
   bankName: string | null;
 
-  @Column({ name: 'account_name', type: 'varchar', length: 150, nullable: true })
+  @Column({
+    name: 'account_name',
+    type: 'varchar',
+    length: 150,
+    nullable: true,
+  })
   accountName: string | null;
 
-  @Column({ name: 'account_number', type: 'varchar', length: 50, nullable: true })
+  @Column({
+    name: 'account_number',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
   accountNumber: string | null;
 
   @Column({ name: 'session_rate', type: 'decimal', precision: 12, scale: 2 })

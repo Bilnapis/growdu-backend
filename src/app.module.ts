@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { InvoicesModule } from './invoices/invoices.module.js';
+import { PayrollModule } from './payroll/payroll.module.js';
 import { AnnouncementsModule } from './announcements/announcements.module.js';
 import { ConfigModule, ConfigType } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -60,6 +61,7 @@ import { UsersModule } from './users/users.module.js';
     ParentsModule,
     StudentsModule,
     InvoicesModule,
+    PayrollModule,
     RoomsModule,
     SchedulesModule,
     StudyGroupsModule,

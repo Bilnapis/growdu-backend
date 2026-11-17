@@ -24,6 +24,14 @@ try {
   process.env.DB_NAME = databaseName;
   ({ default: db } = await import('../src/database/data-source.ts'));
   await db.initialize();
+  // This verifier exercises the invoice migration as its final migration.
+  // Later feature migrations are covered by their own verification scripts.
+  db.migrations = db.migrations.filter(
+    (migration) =>
+      Number(
+        (migration.name ?? migration.constructor.name).match(/\d+$/)?.[0],
+      ) <= 20261115000000,
+  );
   await db.runMigrations();
   assert.equal(
     db.migrations.at(-1)?.constructor.name,

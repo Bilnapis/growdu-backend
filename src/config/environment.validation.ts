@@ -1,6 +1,14 @@
 import Joi from 'joi';
 
 export const environmentValidationSchema = Joi.object({
+  PAYROLL_PROOF_STORAGE_PATH: Joi.string()
+    .trim()
+    .min(1)
+    .default('storage/payroll-proofs'),
+  PAYROLL_AUTOMATION_ENABLED: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(true),
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
     .default('development'),

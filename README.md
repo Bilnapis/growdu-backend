@@ -321,3 +321,9 @@ node --loader ts-node/esm scripts/verify-metric-history-migration.mjs
 
 Panduan setup, aturan pembayaran, default jatuh tempo tanggal 1/tenggang 0 hari,
 API, dan penyimpanan bukti privat tersedia di [docs/invoices.md](docs/invoices.md).
+
+## Penggajian Tentor
+
+Panduan siklus gaji, tarif per sesi, generate otomatis, pembayaran/pembatalan,
+slip PDF, dan aktivasi migration tersedia di [docs/payroll.md](docs/payroll.md).
+Verifikasi migration pada database sementara: `npm run migration:verify:payroll`.

@@ -16,5 +16,9 @@ export default registerAs('app', () => {
       process.env.INVOICE_PROOF_STORAGE_PATH ?? 'storage/invoice-proofs',
     invoiceAutomationEnabled:
       process.env.INVOICE_AUTOMATION_ENABLED !== 'false',
+    payrollProofStoragePath:
+      process.env.PAYROLL_PROOF_STORAGE_PATH ?? 'storage/payroll-proofs',
+    payrollAutomationEnabled:
+      process.env.PAYROLL_AUTOMATION_ENABLED !== 'false',
   };
 });
