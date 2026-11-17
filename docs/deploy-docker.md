@@ -5,14 +5,15 @@ Tiga container utama menjalankan MySQL 8.4, backend NestJS, dan frontend React
 melalui Caddy. Build dilakukan di VPS. Tidak perlu memasang Node.js, MySQL,
 Nginx, atau Certbot pada host.
 
-Gunakan satu domain, misalnya `app.example.com`, dengan DNS A (dan AAAA jika
-IPv6 tersedia) mengarah langsung ke VPS. Buka port SSH, TCP 80/443, dan opsional
-UDP 443 pada firewall penyedia. Port 3000/3306 tidak dipublikasikan. Jangan
+Panduan ini disiapkan untuk IP publik VPS **`139.190.107.136`**, tanpa domain.
+Pastikan IP tersebut tetap terpasang pada VPS. Buka port SSH, TCP 80/443, dan
+opsional UDP 443 pada firewall penyedia. Izinkan koneksi keluar HTTPS untuk
+menghubungi layanan sertifikat. Port 3000/3306 tidak dipublikasikan. Jangan
 menjalankan Nginx atau proxy lain pada port 80/443 bersamaan dengan stack ini.
 
 | Alamat                                | Tujuan                                  |
 | ------------------------------------- | --------------------------------------- |
-| `https://app.example.com/`            | Frontend React                          |
+| `https://139.190.107.136/`            | Frontend React                          |
 | `/admin`                              | Panel super-admin frontend              |
 | `/api/v1`                             | REST API dan pemeriksaan status backend |
 | `/uploads/tenant-logos/...`           | Logo publik                             |
@@ -20,6 +21,11 @@ menjalankan Nginx atau proxy lain pada port 80/443 bersamaan dengan stack ini.
 
 AdminJS dinonaktifkan, Swagger dinonaktifkan, dan cookie autentikasi memakai
 HTTPS. Caddy memperbarui sertifikat otomatis; data sertifikat disimpan di volume.
+Untuk IP publik, gunakan issuer Let's Encrypt dengan profil `shortlived` sesuai
+langkah 2.1. Sertifikat IP berlaku 160 jam (sekitar enam hari), sehingga Caddy
+dan akses validasi port 80/443 harus tetap tersedia untuk pembaruan otomatis.
+[Rujukan sertifikat IP Let's Encrypt](https://letsencrypt.org/2026/01/15/6day-and-ip-general-availability/).
+
 API dan UI menggunakan origin yang sama. Backend mempercayai satu hop proxy
 karena hanya Caddy yang menjadi pintu masuk publik. Jangan membuka port backend
 atau menambah CDN/proxy di depannya tanpa meninjau konfigurasi kepercayaan proxy.
@@ -27,7 +33,16 @@ atau menambah CDN/proxy di depannya tanpa meninjau konfigurasi kepercayaan proxy
 ## 1. Pasang Docker pada VPS baru
 
 Login menggunakan akun SSH yang sudah memiliki sudo, misalnya `abillionaire`.
-Jalankan perintah berikut di VPS Ubuntu:
+Jika memakai private key `abillionaire.pem`, jalankan dari terminal lokal pada
+folder key tersebut:
+
+```bash
+chmod 600 abillionaire.pem
+ssh -i abillionaire.pem abillionaire@139.190.107.136
+```
+
+Sesuaikan nama key dan username jika berbeda. Private key tetap di komputer
+lokal. Setelah masuk, jalankan perintah berikut **di VPS Ubuntu 24.04**:
 
 ```bash
 sudo apt update
@@ -74,8 +89,39 @@ GrowDu/
 └── growdu-frontend/
 ```
 
-Clone menggunakan URL Git masing-masing dan checkout tag/commit yang akan
-dirilis. Semua perintah Compose berikut dijalankan dari `growdu-backend/`.
+`git clone` berarti mengunduh salinan kode dari GitHub ke VPS. Backend dan
+frontend berada di dua repository berbeda. Untuk setup ini, gunakan branch
+`feat/tutor-payroll`, yaitu branch lokal yang saat ini memuat konfigurasi Docker.
+Pastikan perubahan yang akan dirilis sudah di-commit dan di-push ke branch
+tersebut pada kedua repository dari komputer lokal.
+
+Setelah login SSH, jalankan perintah berikut **di terminal VPS**. Perintah ini
+membuat folder `GrowDu` di direktori home akun VPS, lalu mengunduh kedua aplikasi:
+
+```bash
+mkdir -p ~/GrowDu
+cd ~/GrowDu
+git clone --branch feat/tutor-payroll https://github.com/Bilnapis/growdu-backend.git growdu-backend
+git clone --branch feat/tutor-payroll https://github.com/Bilnapis/bimblekit.git growdu-frontend
+```
+
+Repository frontend bernama `bimblekit`; argumen terakhir `growdu-frontend`
+menentukan nama folder hasil clone yang dibutuhkan Compose. Jika folder hasil
+clone sudah ada di VPS, gunakan folder tersebut dan periksa branch-nya sebelum
+melanjutkan; jangan menjalankan clone lagi ke folder yang sama.
+
+`--branch feat/tutor-payroll` memilih cabang kode yang akan dipasang. Tag atau
+commit adalah penanda versi tertentu untuk rilis; pada setup pertama ini,
+perintah di atas sudah memilih branch tersebut. Catat versi yang terunduh
+untuk memudahkan update atau rollback:
+
+```bash
+git -C growdu-backend rev-parse --short HEAD
+git -C growdu-frontend rev-parse --short HEAD
+```
+
+Setelah kedua clone berhasil, lanjutkan dari folder backend. Semua perintah
+Compose berikut dijalankan dari `~/GrowDu/growdu-backend/`:
 
 ```bash
 cd growdu-backend
@@ -88,8 +134,17 @@ Di Windows, salin file dengan `Copy-Item .env.docker.example .env.docker`.
 Build lokal dapat dilakukan dengan Docker Desktop pada Windows/macOS atau
 Docker Engine pada Linux; perintah administrasi VPS dalam panduan ini memakai Bash.
 
-Edit `.env.docker` menggunakan editor. Isi domain tanpa `https://`, email ACME
-yang aktif, dan `GROWDU_IMAGE_TAG` unik untuk rilis, misalnya `release-20261117-1`.
+Edit `.env.docker` menggunakan editor. Isi host aplikasi dengan IP VPS, tanpa
+`https://`, port, atau path. Nama variable `APP_DOMAIN` tetap digunakan untuk
+host, termasuk ketika nilainya berupa IP:
+
+```dotenv
+APP_DOMAIN=139.190.107.136
+ACME_EMAIL=GANTI_DENGAN_EMAIL_AKTIF
+GROWDU_IMAGE_TAG=release-20261117-1
+```
+
+Ganti `ACME_EMAIL` dengan email aktif dan gunakan tag image unik untuk setiap rilis.
 Buat nilai berbeda untuk `MYSQL_ROOT_PASSWORD`, `DB_MIGRATOR_PASSWORD`,
 `DB_APP_PASSWORD`, dan `JWT_ACCESS_SECRET`. Jalankan empat kali:
 
@@ -103,15 +158,71 @@ Compose meneruskan kredensial hanya ke service yang memerlukannya; backend tidak
 menerima password root maupun migrator.
 
 `PUBLIC_BASE_URL`, allowlist CORS, dan `VITE_API_BASE_URL` diturunkan dari
-`APP_DOMAIN`. URL API frontend berbentuk `https://DOMAIN/api/v1` dan masuk ke
-bundle saat build; perubahan domain memerlukan rebuild frontend. File `.env`
-development kedua aplikasi tidak diperlukan dan tidak disalin ke image.
+`APP_DOMAIN`. Untuk IP ini, nilainya menjadi:
+
+| Konfigurasi         | Nilai                            |
+| ------------------- | -------------------------------- |
+| `PUBLIC_BASE_URL`   | `https://139.190.107.136`        |
+| `FRONTEND_ORIGINS`  | `https://139.190.107.136`        |
+| `VITE_API_BASE_URL` | `https://139.190.107.136/api/v1` |
+
+Compose mengisi ketiganya secara otomatis; cukup atur `APP_DOMAIN`. URL API
+masuk ke bundle saat build, sehingga perubahan IP/domain memerlukan rebuild
+frontend dan penerapan ulang environment backend. File `.env` development kedua
+aplikasi tidak diperlukan dan tidak disalin ke image. Pertahankan HTTPS dan
+cookie Secure agar login serta refresh session bekerja.
+
+### 2.1. Siapkan Caddy untuk sertifikat IP
+
+**Lakukan penyesuaian source berikut sebelum build.** Caddyfile bawaan repository
+menggunakan konfigurasi domain; mengganti `.env.docker` saja belum menyiapkan
+sertifikat IP publik. Dari direktori backend, buka
+`../growdu-frontend/docker/Caddyfile` menggunakan editor.
+
+Ubah blok global paling atas menjadi:
+
+```caddyfile
+{
+	email {$ACME_EMAIL}
+	admin off
+	default_sni {$APP_DOMAIN}
+}
+```
+
+Di dalam blok situs `{$APP_DOMAIN}`, sisipkan blok berikut tepat sebelum baris
+`encode zstd gzip`:
+
+```caddyfile
+tls {
+	issuer acme https://acme-v02.api.letsencrypt.org/directory {
+		profile shortlived
+	}
+}
+```
+
+Pertahankan seluruh handler API, uploads, file statis, route React, path privat,
+dan listener healthcheck `:8080` yang sudah ada. Simpan file source tersebut;
+Dockerfile frontend menyalinnya ke image pada langkah build. Catat atau commit
+perubahan Caddy ini di repository frontend agar ikut pada rilis berikutnya.
+
+`default_sni` membantu memilih sertifikat IP ketika browser tidak mengirim nama
+SNI, termasuk saat Caddy berjalan di belakang jaringan Docker/NAT. Issuer ACME
+dipilih secara eksplisit agar sertifikat IP diminta dari Let's Encrypt dengan
+profil yang sesuai. Tidak diperlukan record DNS untuk IP ini.
+Rujukan: [opsi default_sni](https://caddyserver.com/docs/caddyfile/options#default-sni)
+dan [issuer ACME Caddy](https://caddyserver.com/docs/caddyfile/directives/tls#acme).
+
+Gunakan image Caddy 2 terbaru melalui `build --pull` pada langkah berikut. Jangan
+mengubah issuer menjadi `internal` untuk akses publik: sertifikat internal hanya
+dipercaya oleh perangkat yang memasang CA tersebut. Penerbitan sertifikat IP
+publik harus dijalankan pada VPS `139.190.107.136`, dengan port validasi tersedia.
 
 ## 3. Build, migrasi, dan hidupkan aplikasi
 
 ```bash
 docker compose --env-file .env.docker -f compose.production.yaml config --quiet
 docker compose --env-file .env.docker -f compose.production.yaml build --pull mysql backend frontend
+docker compose --env-file .env.docker -f compose.production.yaml run --rm --no-deps frontend caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile
 docker compose --env-file .env.docker -f compose.production.yaml up -d --wait mysql
 docker compose --env-file .env.docker -f compose.production.yaml run --rm migrate
 docker compose --env-file .env.docker -f compose.production.yaml up -d --wait --no-build
@@ -120,6 +231,9 @@ docker compose --env-file .env.docker -f compose.production.yaml up -d --wait --
 **Jalankan setiap langkah setelah langkah sebelumnya berhasil.** Migrasi memakai
 hasil kompilasi production dan akun `growdu_migrator`. Schema tidak dibuat oleh
 startup backend; `synchronize` dan `migrationsRun` tetap `false`.
+Perintah `caddy adapt` memeriksa parsing konfigurasi dan menampilkan JSON; periksa
+bahwa issuer memakai `shortlived` dan default SNI adalah `139.190.107.136`.
+Pemeriksaan ini belum menerbitkan atau memverifikasi sertifikat publik.
 
 Pada volume baru, image MySQL membuat database dan akun migrator, lalu script
 inisialisasi membuat `growdu_app` dengan hak SELECT/INSERT/UPDATE/DELETE saja.
@@ -143,14 +257,28 @@ Periksa status dan log:
 ```bash
 docker compose --env-file .env.docker -f compose.production.yaml ps
 docker compose --env-file .env.docker -f compose.production.yaml logs --tail=100 mysql backend frontend
-curl --fail https://app.example.com/api/v1
 ```
+
+Kemudian periksa dari komputer lokal melalui internet:
+
+```bash
+curl --head http://139.190.107.136
+curl --fail --show-error https://139.190.107.136/api/v1
+```
+
+HTTP harus mengarah ke HTTPS. Pemeriksaan HTTPS harus berhasil dengan validasi
+sertifikat normal; jangan menambahkan `-k`/`--insecure`. Buka
+`https://139.190.107.136` dan `https://139.190.107.136/admin` di browser untuk
+menguji akun owner dan super-admin setelah provisioning pada langkah 4.
 
 Status backend mengembalikan `{"service":"growdu-backend","status":"ok"}`.
 Healthcheck backend memeriksa HTTP aplikasi, bukan pemeriksaan SQL berkelanjutan.
 Uji HTTPS dari browser juga; healthcheck frontend hanya memeriksa proses Caddy
-melalui port internal 8080. Jika sertifikat gagal, periksa DNS, port 80/443, email,
-dan log frontend. Hindari pengulangan permintaan sertifikat dengan menghapus volume Caddy.
+melalui port internal 8080. Jika sertifikat gagal, periksa penetapan IP pada VPS,
+akses publik port 80/443, email, profil `shortlived`, dan log frontend. Jika
+handshake mencari sertifikat untuk IP container, periksa `default_sni` dan
+pastikan frontend sudah dibangun ulang setelah Caddyfile diedit. Hindari
+pengulangan permintaan sertifikat dengan menghapus volume Caddy.
 
 ## 4. Buat akun awal
 
@@ -215,7 +343,7 @@ enkripsi karena berisi data pengguna, secret, dan private key TLS. Jangan hanya
 mengandalkan volume pada disk VPS sebagai backup.
 
 Untuk **restore pada database/volume baru yang masih kosong**, gunakan secret,
-nama database, domain, dan image rilis dari backup. Hidupkan MySQL hingga sehat,
+nama database, host/IP aplikasi, dan image rilis dari backup. Hidupkan MySQL hingga sehat,
 biarkan inisialisasi membuat kedua akun, lalu impor sebelum menyalakan aplikasi:
 
 ```bash
@@ -282,7 +410,7 @@ atau prune volume** pada deployment yang datanya masih dibutuhkan.
 - Login, refresh session, logout, dan panel frontend `/admin` bekerja.
 - Refresh pada route seperti `/settings/bimbel` tetap membuka React.
 - `/backend-admin/login`, `/docs`, dan `/storage/...` mengembalikan 404.
-- Upload logo berfungsi dan URL publik menggunakan domain HTTPS.
+- Upload logo berfungsi dan URL publik memakai `https://139.190.107.136`.
 - Bukti invoice/payroll hanya dapat diakses dengan otorisasi yang sesuai.
 - Database, logo, dan bukti tetap tersedia setelah container dibuat ulang tanpa
   menghapus volume.
@@ -291,6 +419,19 @@ atau prune volume** pada deployment yang datanya masih dibutuhkan.
 Sebelum merilis source, jalankan lint/test/build backend dan typecheck/lint/build
 frontend sesuai `AGENTS.md`. Smoke test Docker memerlukan Docker Engine yang
 aktif; pemeriksaan TypeScript saja tidak membuktikan container dapat berjalan.
+
+## 8. Beralih ke domain setelah tersedia
+
+Arahkan DNS A domain ke `139.190.107.136`, lalu ganti `APP_DOMAIN` dengan domain
+tanpa protokol atau path. Hapus blok `tls` khusus `shortlived` pada Caddyfile
+untuk kembali ke issuer domain bawaan; `default_sni {$APP_DOMAIN}` dapat
+dipertahankan. Ikuti proses update pada langkah 6, termasuk rebuild frontend
+dan penerapan ulang environment backend. Pertahankan nama project Compose,
+database, secret, serta seluruh volume agar data tetap tersedia.
+
+Login kembali pada host baru dan periksa logo/tautan yang tersimpan dengan URL
+IP absolut. Unggah ulang atau perbarui URL logo melalui pengaturan jika masih
+mengarah ke host lama.
 
 Rujukan: [Compose startup order](https://docs.docker.com/compose/how-tos/startup-order/),
 [Compose run](https://docs.docker.com/reference/cli/docker/compose/run/),
@@ -320,8 +461,13 @@ tidak digunakan. Hasil yang berhasil diperiksa:
 - Lint backend/frontend, typecheck frontend, build kedua aplikasi di Docker,
   dan 171 unit test backend berhasil.
 
-Sertifikat publik ACME untuk domain VPS dan arsitektur AMD64 belum diuji pada
-validasi lokal ini. Saat build, npm audit juga melaporkan 7 temuan high pada
+Contoh Caddy untuk `139.190.107.136` juga lolos parsing pada Caddy 2.11.9 dan
+pengujian TLS tanpa SNI dengan CA lokal dalam Docker yang terisolasi. Seluruh
+contoh perintah Bash pada panduan lolos pemeriksaan sintaks.
+
+Sertifikat publik ACME untuk IP/domain VPS dan arsitektur AMD64 belum diuji pada
+validasi lokal ini. Penerbitan sertifikat publik dan pemeriksaan akses internet
+tetap dilakukan pada VPS. Saat build, npm audit juga melaporkan 7 temuan high pada
 dependency production backend dan 4 high pada dependency build frontend. Dependency
 tidak di-upgrade sebagai bagian dari perbaikan Docker ini; temuan tersebut perlu
 ditinjau terpisah sebelum rilis production.
