@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
-import { Module } from '@nestjs/common';
-import { ConfigType } from '@nestjs/config';
+import { Module, type DynamicModule } from '@nestjs/common';
+import { ConfigModule, ConfigType } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import adminConfig from '../config/admin.config.js';
 import { EntityStatus } from '../common/enums/entity-status.enum.js';
@@ -16,8 +16,9 @@ function safelyMatches(value: string, expected: string): boolean {
   );
 }
 
-const adminJsModule = import('@adminjs/nestjs').then(({ AdminModule }) =>
-  AdminModule.createAdminAsync({
+async function createAdminJsModule() {
+  const { AdminModule } = await import('@adminjs/nestjs');
+  return AdminModule.createAdminAsync({
     inject: [adminConfig.KEY, DataSource],
     useFactory: (
       config: ConfigType<typeof adminConfig>,
@@ -146,10 +147,17 @@ const adminJsModule = import('@adminjs/nestjs').then(({ AdminModule }) =>
         },
       };
     },
-  }),
-);
+  });
+}
 
-@Module({
-  imports: [adminJsModule],
-})
-export class AdminPanelModule {}
+@Module({})
+export class AdminPanelModule {
+  static async register(): Promise<DynamicModule> {
+    await ConfigModule.envVariablesLoaded;
+
+    return {
+      module: AdminPanelModule,
+      imports: adminConfig().enabled ? [await createAdminJsModule()] : [],
+    };
+  }
+}

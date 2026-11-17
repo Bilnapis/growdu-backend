@@ -2,6 +2,14 @@
 
 Backend Growdu menggunakan NestJS, TypeORM, dan MySQL/MariaDB dari XAMPP.
 
+Untuk deployment Docker production (backend, frontend/Caddy, MySQL, dan HTTPS),
+ikuti [docs/deploy-docker.md](docs/deploy-docker.md). Konfigurasinya berada di
+`compose.production.yaml`; isi `.env.docker` dari `.env.docker.example`.
+
+Panduan deployment backend dan frontend ke VPS tersedia di
+[docs/deploy-vps.md](docs/deploy-vps.md), termasuk Nginx, HTTPS, systemd, migrasi,
+penyimpanan file, backup, dan deploy ulang.
+
 ## Prasyarat
 
 - Node.js `>= 22.22.3`
@@ -72,6 +80,8 @@ request langsung dari browser.
 | `API_PREFIX` | Prefix seluruh endpoint | `api/v1` |
 | `SWAGGER_ENABLED` | Aktifkan dashboard Swagger | `true` |
 | `SWAGGER_PATH` | Path dokumentasi Swagger | `docs` |
+| `TRUST_PROXY_HOPS` | Jumlah reverse proxy tepercaya; `1` pada stack Docker privat | `0` |
+| `ADMIN_ENABLED` | Muat AdminJS; Docker production menonaktifkannya | `true` |
 | `ADMIN_ROOT_PATH` | Path AdminJS internal | `/backend-admin` |
 | `ADMIN_EMAIL` | Email untuk login AdminJS | wajib |
 | `ADMIN_PASSWORD` | Password AdminJS, minimal 5 karakter | wajib |
@@ -99,6 +109,8 @@ request langsung dari browser.
 | `PROVISION_OWNER_PASSWORD` | Password OWNER 12–128 karakter | hanya command |
 
 Aplikasi akan berhenti saat startup jika konfigurasi wajib tidak valid.
+Kredensial `ADMIN_EMAIL`, `ADMIN_PASSWORD`, dan `ADMIN_COOKIE_SECRET` hanya wajib
+saat `ADMIN_ENABLED=true`. Flag ini tidak menonaktifkan panel frontend `/admin`.
 
 Untuk production, atur `SWAGGER_ENABLED=false` jika dokumentasi API tidak boleh
 diakses publik. Ganti seluruh kredensial AdminJS dan gunakan session store

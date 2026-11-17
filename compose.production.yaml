@@ -1,0 +1,164 @@
+name: growdu-production
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+x-backend-image: &backend-image
+  image: growdu-backend:${GROWDU_IMAGE_TAG:-local}
+  build:
+    context: .
+  init: true
+  security_opt:
+    - no-new-privileges:true
+  logging: *logging
+
+x-database-environment: &database-environment
+  NODE_ENV: production
+  DB_HOST: mysql
+  DB_PORT: '3306'
+  DB_NAME: ${DB_NAME:-growdu}
+  DB_LOGGING: 'false'
+  DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+
+services:
+  mysql:
+    image: growdu-mysql:${GROWDU_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: docker/mysql.Dockerfile
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # Only the migrator has DDL privileges on this dedicated database.
+      - --log-bin-trust-function-creators=1
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-growdu}
+      MYSQL_USER: growdu_migrator
+      MYSQL_PASSWORD: ${DB_MIGRATOR_PASSWORD:?Set DB_MIGRATOR_PASSWORD in .env.docker}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env.docker}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?Set DB_APP_PASSWORD in .env.docker}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - database
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$${MYSQL_PASSWORD}" mysql --protocol=TCP --host=127.0.0.1 --user="$${MYSQL_USER}" --database="$${MYSQL_DATABASE}" --silent --skip-column-names --execute="SELECT 1"
+          && MYSQL_PWD="$${DB_APP_PASSWORD}" mysql --protocol=TCP --host=127.0.0.1 --user=growdu_app --database="$${MYSQL_DATABASE}" --silent --skip-column-names --execute="SELECT 1"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging: *logging
+
+  backend:
+    <<: *backend-image
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      <<: *database-environment
+      PORT: '3000'
+      API_PREFIX: api/v1
+      PUBLIC_BASE_URL: https://${APP_DOMAIN:?Set APP_DOMAIN in .env.docker}
+      FRONTEND_ORIGINS: https://${APP_DOMAIN:?Set APP_DOMAIN in .env.docker}
+      SWAGGER_ENABLED: 'false'
+      ADMIN_ENABLED: 'false'
+      TRUST_PROXY_HOPS: '1'
+      AUTH_COOKIE_SECURE: 'true'
+      AUTH_COOKIE_SAME_SITE: lax
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in .env.docker}
+      DB_USERNAME: growdu_app
+      DB_PASSWORD: ${DB_APP_PASSWORD:?Set DB_APP_PASSWORD in .env.docker}
+      INVOICE_AUTOMATION_ENABLED: ${INVOICE_AUTOMATION_ENABLED:-true}
+      PAYROLL_AUTOMATION_ENABLED: ${PAYROLL_AUTOMATION_ENABLED:-true}
+      INVOICE_PROOF_STORAGE_PATH: /app/storage/invoice-proofs
+      PAYROLL_PROOF_STORAGE_PATH: /app/storage/payroll-proofs
+    volumes:
+      - uploads:/app/uploads
+      - private_storage:/app/storage
+    networks:
+      - web
+      - database
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/v1', { signal: AbortSignal.timeout(3000) }).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    image: growdu-frontend:${GROWDU_IMAGE_TAG:-local}
+    build:
+      context: ../growdu-frontend
+      args:
+        VITE_API_BASE_URL: https://${APP_DOMAIN:?Set APP_DOMAIN in .env.docker}/api/v1
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.docker}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env.docker}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '-q',
+          '-O',
+          '/dev/null',
+          'http://127.0.0.1:8080/healthz',
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+
+  migrate:
+    <<: *backend-image
+    profiles: ['tools']
+    restart: 'no'
+    command: ['npm', 'run', 'migration:run:prod']
+    environment:
+      <<: *database-environment
+      DB_USERNAME: growdu_migrator
+      DB_PASSWORD: ${DB_MIGRATOR_PASSWORD:?Set DB_MIGRATOR_PASSWORD in .env.docker}
+    networks:
+      - database
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+networks:
+  web:
+  database:
+    internal: true
+
+volumes:
+  mysql_data:
+  uploads:
+  private_storage:
+  caddy_data:
+  caddy_config:

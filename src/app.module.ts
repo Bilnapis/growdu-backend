@@ -66,7 +66,7 @@ import { UsersModule } from './users/users.module.js';
     SchedulesModule,
     StudyGroupsModule,
     PlatformAdminModule,
-    AdminPanelModule,
+    AdminPanelModule.register(),
   ],
   controllers: [AppController],
   providers: [AppService],

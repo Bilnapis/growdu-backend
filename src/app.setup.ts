@@ -12,6 +12,7 @@ export function configureApplication(app: NestExpressApplication): void {
   const config = app.get<ConfigType<typeof appConfig>>(appConfig.KEY);
   const authentication = app.get<ConfigType<typeof authConfig>>(authConfig.KEY);
 
+  app.set('trust proxy', config.trustProxyHops);
   app.setGlobalPrefix(config.apiPrefix);
   app.enableCors({
     origin: (

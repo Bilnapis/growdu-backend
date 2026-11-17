@@ -1,5 +1,13 @@
 import Joi from 'joi';
 
+const adminCredentialPresence = {
+  is: true,
+  // Joi uses this key for a schema branch, not a Promise callback.
+  // oxlint-disable-next-line unicorn/no-thenable
+  then: Joi.required(),
+  otherwise: Joi.optional().allow(''),
+};
+
 export const environmentValidationSchema = Joi.object({
   PAYROLL_PROOF_STORAGE_PATH: Joi.string()
     .trim()
@@ -13,6 +21,7 @@ export const environmentValidationSchema = Joi.object({
     .valid('development', 'test', 'production')
     .default('development'),
   PORT: Joi.number().port().default(3000),
+  TRUST_PROXY_HOPS: Joi.number().integer().min(0).max(10).default(0),
   INVOICE_PROOF_STORAGE_PATH: Joi.string()
     .trim()
     .min(1)
@@ -30,13 +39,20 @@ export const environmentValidationSchema = Joi.object({
     .trim()
     .pattern(/^[a-zA-Z0-9_-]+$/)
     .default('docs'),
+  ADMIN_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),
   ADMIN_ROOT_PATH: Joi.string()
     .trim()
     .pattern(/^\/[a-zA-Z0-9/_-]+$/)
     .default('/backend-admin'),
-  ADMIN_EMAIL: Joi.string().email().required(),
-  ADMIN_PASSWORD: Joi.string().min(5).required(),
-  ADMIN_COOKIE_SECRET: Joi.string().min(32).required(),
+  ADMIN_EMAIL: Joi.string()
+    .email()
+    .when('ADMIN_ENABLED', adminCredentialPresence),
+  ADMIN_PASSWORD: Joi.string()
+    .min(5)
+    .when('ADMIN_ENABLED', adminCredentialPresence),
+  ADMIN_COOKIE_SECRET: Joi.string()
+    .min(32)
+    .when('ADMIN_ENABLED', adminCredentialPresence),
   DB_HOST: Joi.string().hostname().required(),
   DB_PORT: Joi.number().port().default(3306),
   DB_USERNAME: Joi.string().trim().required(),
