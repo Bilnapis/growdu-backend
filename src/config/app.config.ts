@@ -21,5 +21,7 @@ export default registerAs('app', () => {
       process.env.PAYROLL_PROOF_STORAGE_PATH ?? 'storage/payroll-proofs',
     payrollAutomationEnabled:
       process.env.PAYROLL_AUTOMATION_ENABLED !== 'false',
+    learningReportAutomationEnabled:
+      process.env.LEARNING_REPORT_AUTOMATION_ENABLED !== 'false',
   };
 });

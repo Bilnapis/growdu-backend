@@ -339,3 +339,36 @@ API, dan penyimpanan bukti privat tersedia di [docs/invoices.md](docs/invoices.m
 Panduan siklus gaji, tarif per sesi, generate otomatis, pembayaran/pembatalan,
 slip PDF, dan aktivasi migration tersedia di [docs/payroll.md](docs/payroll.md).
 Verifikasi migration pada database sementara: `npm run migration:verify:payroll`.
+
+## Laporan Perkembangan Belajar
+
+Menu `/reports` (owner/operator dengan permission `reports`) dan `/tutor/reports`
+menyediakan laporan bulanan per kelompok, dengan kontribusi masing-masing tentor.
+Draft dapat disimpan sebelum lengkap. Penerbitan memerlukan evaluasi wajib dan
+presensi lengkap untuk seluruh sesi tentor yang tidak dibatalkan pada bulan itu.
+Kelompok berstatus Terbit sebagian sampai semua tentor yang ditugaskan selesai.
+
+Pengaturan Laporan menentukan tanggal pembuatan draft otomatis (1–31, default 1)
+dan status aktif per bimbel. Mulai pukul 00.00 WIB pada tanggal tersebut, backend
+membuat draft **bulan sebelumnya**; misalnya 1 Oktober membuat laporan September.
+Tanggal yang tidak tersedia memakai hari terakhir bulan. Pemeriksaan berjalan
+saat startup dan setiap menit, dikendalikan secara global oleh
+`LEARNING_REPORT_AUTOMATION_ENABLED=true`. Tidak diperlukan cron eksternal.
+
+Aktivasi pertama/ulang dimulai dari jadwal bulan aktivasi: jika sudah jatuh tempo,
+draft dibuat pada pemeriksaan berikutnya. Masa nonaktif tidak menjadi backlog;
+downtime saat aktif dipulihkan bertahap (maksimal 24 bulan per transaksi).
+Mengubah tanggal mempertahankan jadwal aktif yang tertinggal. Otomatisasi dan
+aksi Buat draft periode hanya menambahkan kontribusi yang belum tersedia;
+draft yang sudah diisi, versi terbit, dan revisi tidak ditimpa. Isi evaluasi
+diisi tentor, tanpa AI maupun penerbitan/email otomatis.
+
+Owner/operator membuka revisi dengan alasan. Isi dan presensi saat terbit
+disimpan sebagai snapshot; versi tersebut tetap tampil sampai revisi terbit.
+PDF kelompok ditujukan untuk internal. PDF per siswa hanya memuat evaluasi yang
+mencakup siswa itu, presensinya, dan catatan khusus miliknya. Draft tidak diekspor.
+
+REST API berada di `/api/v1/learning-reports`; kontrak lengkap tersedia di Swagger.
+Jalankan `npm run migration:run` sebelum backend baru dinyalakan. Verifikasi
+migration naik/turun/naik pada database sementara:
+`npm run migration:verify:learning-reports`.

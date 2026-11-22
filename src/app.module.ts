@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ReportsModule } from './learning-reports/reports.module.js';
 import { InvoicesModule } from './invoices/invoices.module.js';
 import { PayrollModule } from './payroll/payroll.module.js';
 import { AnnouncementsModule } from './announcements/announcements.module.js';
@@ -52,6 +53,7 @@ import { UsersModule } from './users/users.module.js';
       }),
     }),
     AuthModule,
+    ReportsModule,
     AnnouncementsModule,
     OwnersModule,
     OperatorsModule,

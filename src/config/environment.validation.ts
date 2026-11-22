@@ -9,6 +9,10 @@ const adminCredentialPresence = {
 };
 
 export const environmentValidationSchema = Joi.object({
+  LEARNING_REPORT_AUTOMATION_ENABLED: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(true),
   PAYROLL_PROOF_STORAGE_PATH: Joi.string()
     .trim()
     .min(1)

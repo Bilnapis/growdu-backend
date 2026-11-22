@@ -102,11 +102,11 @@ membuat folder `GrowDu` di direktori home akun VPS, lalu mengunduh kedua aplikas
 mkdir -p ~/GrowDu
 cd ~/GrowDu
 git clone --branch feat/tutor-payroll https://github.com/Bilnapis/growdu-backend.git growdu-backend
-git clone --branch feat/tutor-payroll https://github.com/Bilnapis/bimblekit.git growdu-frontend
+git clone --branch feat/tutor-payroll https://github.com/Bilnapis/growdu-frontend.git growdu-frontend
 ```
 
-Repository frontend bernama `bimblekit`; argumen terakhir `growdu-frontend`
-menentukan nama folder hasil clone yang dibutuhkan Compose. Jika folder hasil
+Repository frontend sudah menggunakan nama `growdu-frontend`; argumen terakhir
+`growdu-frontend` menentukan nama folder hasil clone yang dibutuhkan Compose. Jika folder hasil
 clone sudah ada di VPS, gunakan folder tersebut dan periksa branch-nya sebelum
 melanjutkan; jangan menjalankan clone lagi ke folder yang sama.
 
@@ -272,7 +272,8 @@ sertifikat normal; jangan menambahkan `-k`/`--insecure`. Buka
 menguji akun owner dan super-admin setelah provisioning pada langkah 4.
 
 Status backend mengembalikan `{"service":"growdu-backend","status":"ok"}`.
-Healthcheck backend memeriksa HTTP aplikasi, bukan pemeriksaan SQL berkelanjutan.
+Healthcheck backend memeriksa HTTP
+aplikasi, bukan pemeriksaan SQL berkelanjutan.
 Uji HTTPS dari browser juga; healthcheck frontend hanya memeriksa proses Caddy
 melalui port internal 8080. Jika sertifikat gagal, periksa penetapan IP pada VPS,
 akses publik port 80/443, email, profil `shortlived`, dan log frontend. Jika

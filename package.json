@@ -30,6 +30,7 @@
     "migration:show": "npm run typeorm -- migration:show",
     "migration:verify:invoices": "node --loader ts-node/esm scripts/verify-invoice-migration.mjs",
     "migration:verify:payroll": "node --loader ts-node/esm scripts/verify-payroll-migration.mjs",
+    "migration:verify:learning-reports": "node --loader ts-node/esm scripts/verify-learning-report-migration.mjs",
     "migration:verify": "node --loader ts-node/esm scripts/verify-migration.mjs",
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
