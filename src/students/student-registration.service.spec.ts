@@ -1,3 +1,5 @@
+import type { ConfigurationsService } from '../class-sessions/configurations.service.js';
+import type { ClassSessionsService } from '../class-sessions/class-sessions.service.js';
 import type { DataSource, EntityManager, ObjectLiteral } from 'typeorm';
 import { nextBillingPeriod } from '../common/jakarta-date.js';
 import { EntityStatus } from '../common/enums/entity-status.enum.js';
@@ -23,78 +25,97 @@ function transactionDataSource(manager: EntityManager): DataSource {
 }
 
 describe('StudentRegistrationService', () => {
-  it('creates the student, parent account, and primary relationship atomically', async () => {
-    const savedEntities: ObjectLiteral[] = [];
-    const manager = {
-      findOne: vi.fn().mockResolvedValue(null),
-      create: vi.fn((entity: new () => ObjectLiteral, input: ObjectLiteral) =>
-        Object.assign(new entity(), input),
-      ),
-      save: vi.fn(async (entity: ObjectLiteral) => {
-        if (entity instanceof UserEntity) entity.id = 'user-id';
-        if (entity instanceof ParentEntity) entity.id = 'parent-id';
-        if (entity instanceof StudentEntity) entity.id = 'student-id';
-        savedEntities.push(entity);
-        return entity;
-      }),
-    } as unknown as EntityManager;
-    const passwordHashService = {
-      hash: vi.fn().mockResolvedValue('hashed-password'),
-    } as unknown as PasswordHashService;
-    const service = new StudentRegistrationService(
-      transactionDataSource(manager),
-      passwordHashService,
-    );
-    const dto: CreateStudentRegistrationDto = {
-      name: 'Nadia Putri',
-      gender: StudentGender.Female,
-      educationLevel: 'SMP Kelas 8',
-      school: 'SMP Negeri 2 Bandung',
-      phoneNumber: '+6281234567890',
-      address: 'Jl. Melati No. 12, Bandung',
-      status: EntityStatus.Active,
-      monthlyFee: 450_000,
-      parentSource: StudentParentSource.New,
-      newParent: {
-        name: 'Budi Santoso',
+  it.each([undefined, 'group-id'])(
+    'creates the student, parent account, and optional group atomically (%s)',
+    async (studyGroupId) => {
+      const savedEntities: ObjectLiteral[] = [];
+      const manager = {
+        findOne: vi.fn().mockResolvedValue(null),
+        create: vi.fn((entity: new () => ObjectLiteral, input: ObjectLiteral) =>
+          Object.assign(new entity(), input),
+        ),
+        save: vi.fn(async (entity: ObjectLiteral) => {
+          if (entity instanceof UserEntity) entity.id = 'user-id';
+          if (entity instanceof ParentEntity) entity.id = 'parent-id';
+          if (entity instanceof StudentEntity) entity.id = 'student-id';
+          savedEntities.push(entity);
+          return entity;
+        }),
+      } as unknown as EntityManager;
+      const passwordHashService = {
+        hash: vi.fn().mockResolvedValue('hashed-password'),
+      } as unknown as PasswordHashService;
+      const enrollNewStudent = vi.fn();
+      const lockTenant = vi.fn();
+      const service = new StudentRegistrationService(
+        transactionDataSource(manager),
+        passwordHashService,
+        { enrollNewStudent } as unknown as ConfigurationsService,
+        { lockTenant } as unknown as ClassSessionsService,
+      );
+      const dto: CreateStudentRegistrationDto = {
+        studyGroupId,
+        name: 'Nadia Putri',
+        gender: StudentGender.Female,
+        educationLevel: 'SMP Kelas 8',
+        school: 'SMP Negeri 2 Bandung',
         phoneNumber: '+6281234567890',
-        email: 'BUDI@EXAMPLE.COM',
-        password: 'strong-password',
-      },
-    };
+        address: 'Jl. Melati No. 12, Bandung',
+        status: EntityStatus.Active,
+        monthlyFee: 450_000,
+        parentSource: StudentParentSource.New,
+        newParent: {
+          name: 'Budi Santoso',
+          phoneNumber: '+6281234567890',
+          email: 'BUDI@EXAMPLE.COM',
+          password: 'strong-password',
+        },
+      };
 
-    const result = await service.create('tenant-id', dto);
+      const result = await service.create('tenant-id', dto);
 
-    expect(passwordHashService.hash).toHaveBeenCalledWith('strong-password');
-    expect(savedEntities).toHaveLength(4);
-    expect(savedEntities[0]).toMatchObject({
-      tenantId: 'tenant-id',
-      email: 'budi@example.com',
-      passwordHash: 'hashed-password',
-      role: UserRole.Parent,
-    });
-    expect(savedEntities[1]).toMatchObject({
-      userId: 'user-id',
-      name: 'Budi Santoso',
-    });
-    expect(savedEntities[2]).toMatchObject({
-      id: 'student-id',
-      name: 'Nadia Putri',
-      educationLevel: 'SMP Kelas 8',
-      monthlyFee: 450_000,
-      nextInvoicePeriod: nextBillingPeriod(),
-    });
-    expect(savedEntities[3]).toBeInstanceOf(StudentParentEntity);
-    expect(savedEntities[3]).toMatchObject({
-      studentId: 'student-id',
-      parentId: 'parent-id',
-      isPrimary: true,
-    });
-    expect(result).toMatchObject({
-      parentId: 'parent-id',
-      student: { id: 'student-id', name: 'Nadia Putri' },
-    });
-  });
+      if (studyGroupId) {
+        expect(lockTenant).toHaveBeenCalledWith(manager, 'tenant-id');
+        expect(enrollNewStudent).toHaveBeenCalledWith(
+          manager,
+          expect.objectContaining({ id: 'student-id' }),
+          studyGroupId,
+        );
+      } else {
+        expect(lockTenant).not.toHaveBeenCalled();
+        expect(enrollNewStudent).not.toHaveBeenCalled();
+      }
+      expect(passwordHashService.hash).toHaveBeenCalledWith('strong-password');
+      expect(savedEntities).toHaveLength(4);
+      expect(savedEntities[0]).toMatchObject({
+        tenantId: 'tenant-id',
+        email: 'budi@example.com',
+        passwordHash: 'hashed-password',
+        role: UserRole.Parent,
+      });
+      expect(savedEntities[1]).toMatchObject({
+        userId: 'user-id',
+        name: 'Budi Santoso',
+      });
+      expect(savedEntities[2]).toMatchObject({
+        id: 'student-id',
+        name: 'Nadia Putri',
+        educationLevel: 'SMP Kelas 8',
+        monthlyFee: 450_000,
+        nextInvoicePeriod: nextBillingPeriod(),
+      });
+      expect(savedEntities[3]).toBeInstanceOf(StudentParentEntity);
+      expect(savedEntities[3]).toMatchObject({
+        studentId: 'student-id',
+        parentId: 'parent-id',
+        isPrimary: true,
+      });
+      expect(result).toMatchObject({
+        parentId: 'parent-id',
+        student: { id: 'student-id', name: 'Nadia Putri' },
+      });
+    },
+  );
 
   it('updates the student, primary parent, and parent login email atomically', async () => {
     const student = Object.assign(new StudentEntity(), {
@@ -143,6 +164,8 @@ describe('StudentRegistrationService', () => {
     const service = new StudentRegistrationService(
       transactionDataSource(manager),
       {} as PasswordHashService,
+      { enrollNewStudent: vi.fn() } as unknown as ConfigurationsService,
+      { lockTenant: vi.fn() } as unknown as ClassSessionsService,
     );
     const dto: UpdateStudentRegistrationDto = {
       name: 'Nadia Putri',

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ClassSessionsModule } from '../class-sessions/class-sessions.module.js';
 import { MetricsHistoryModule } from '../metrics-history/metrics-history.module.js';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ParentEntity } from '../parents/entities/parent.entity.js';
@@ -14,6 +15,7 @@ import { TutorStudentsService } from './tutor-students.service.js';
 
 @Module({
   imports: [
+    ClassSessionsModule,
     TypeOrmModule.forFeature([
       StudentEntity,
       StudentParentEntity,

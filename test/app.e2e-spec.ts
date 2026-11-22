@@ -1061,6 +1061,82 @@ describe('AppController (e2e)', () => {
     expect(statuses).toEqual([401, 401, 401, 401, 401, 429]);
   });
 
+  it('registers initial group membership and rolls back registration for an unavailable group', async () => {
+    const owner = sessions.get(UserRole.Owner)!;
+    const api = request(app.getHttpServer());
+    const group = await api
+      .post('/api/v1/study-groups')
+      .auth(owner.accessToken, { type: 'bearer' })
+      .set('X-Tenant-Id', ids.tenantId)
+      .send({
+        name: 'Initial enrollment',
+        effectiveFrom: '2028-02-01',
+        effectiveUntil: '2028-02-28',
+        schedules: [
+          {
+            tutorId: ids.tutorId,
+            dayOfWeek: 6,
+            startTime: '18:00',
+            endTime: '19:00',
+          },
+        ],
+        studentIds: [],
+      })
+      .expect(201);
+    const registration = {
+      name: 'Initial Group Student',
+      gender: 'female',
+      educationLevel: 'SMP Kelas 8',
+      school: 'SMP GrowDu',
+      address: 'Bandung',
+      status: 'active',
+      parentSource: 'existing',
+      parentId: ids.parentId,
+      studyGroupId: group.body.id,
+    };
+    const created = await api
+      .post('/api/v1/students/registrations')
+      .auth(owner.accessToken, { type: 'bearer' })
+      .set('X-Tenant-Id', ids.tenantId)
+      .send(registration)
+      .expect(201);
+    await api
+      .get(`/api/v1/study-groups/${group.body.id}`)
+      .auth(owner.accessToken, { type: 'bearer' })
+      .set('X-Tenant-Id', ids.tenantId)
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body.studentIds).toContain(created.body.student.id),
+      );
+    const snapshots = await dataSource.manager.query(
+      'SELECT student_id FROM class_session_students WHERE student_id = ?',
+      [created.body.student.id],
+    );
+    expect(snapshots.length).toBeGreaterThan(0);
+
+    await dataSource.manager.update('study_groups', group.body.id, {
+      status: EntityStatus.Inactive,
+    });
+    await api
+      .post('/api/v1/students/registrations')
+      .auth(owner.accessToken, { type: 'bearer' })
+      .set('X-Tenant-Id', ids.tenantId)
+      .send({ ...registration, name: 'Rolled Back Student' })
+      .expect(404);
+    expect(
+      await dataSource.manager.countBy(StudentEntity, {
+        name: 'Rolled Back Student',
+        tenantId: ids.tenantId,
+      }),
+    ).toBe(0);
+    await api
+      .post('/api/v1/students/registrations')
+      .auth(owner.accessToken, { type: 'bearer' })
+      .set('X-Tenant-Id', ids.tenantId)
+      .send({ ...registration, studyGroupId: 'invalid' })
+      .expect(400);
+  });
+
   afterAll(async () => {
     await app.close();
   });

@@ -5,7 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { DataSource, EntityManager, In, IsNull } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  In,
+  IsNull,
+  MoreThanOrEqual,
+} from 'typeorm';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type.js';
 import { EntityStatus } from '../common/enums/entity-status.enum.js';
 import { StudentEntity } from '../students/entities/student.entity.js';
@@ -19,7 +25,7 @@ import { ConfigurationInputDto } from './dto/session-input.dto.js';
 import { StudyGroupConfigurationEntity } from './entities/study-group-configuration.entity.js';
 import { ClassSessionEntity } from './entities/class-session.entity.js';
 import { ClassSessionStudentEntity } from './entities/class-session-student.entity.js';
-import { sessionDates, shiftDate } from './session-dates.js';
+import { jakartaDate, sessionDates, shiftDate } from './session-dates.js';
 
 @Injectable()
 export class ConfigurationsService {
@@ -27,6 +33,86 @@ export class ConfigurationsService {
     private readonly db: DataSource,
     private readonly sessions: ClassSessionsService,
   ) {}
+
+  async enrollNewStudent(
+    m: EntityManager,
+    student: StudentEntity,
+    studyGroupId: string,
+  ): Promise<void> {
+    await this.sessions.lockTenant(m, student.tenantId);
+    const group = await m.findOneBy(StudyGroupEntity, {
+      id: studyGroupId,
+      tenantId: student.tenantId,
+      status: EntityStatus.Active,
+    });
+    if (!group) throw new NotFoundException('Kelompok aktif tidak ditemukan');
+    if (student.status !== EntityStatus.Active)
+      throw new BadRequestException('Siswa harus aktif untuk masuk kelompok');
+
+    const now = new Date();
+    const today = jakartaDate(now);
+    const time = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Jakarta',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }).format(now);
+    const configs = await m.find(StudyGroupConfigurationEntity, {
+      where: {
+        tenantId: student.tenantId,
+        studyGroupId,
+        supersededAt: IsNull(),
+        effectiveUntil: MoreThanOrEqual(today),
+      },
+    });
+    if (!configs.length)
+      throw new ConflictException(
+        'Kelompok belum memiliki konfigurasi yang berlaku',
+      );
+
+    await m.save(
+      StudyGroupStudentEntity,
+      configs.map((config) =>
+        m.create(StudyGroupStudentEntity, {
+          tenantId: student.tenantId,
+          studyGroupId,
+          configurationId: config.id,
+          studentId: student.id,
+        }),
+      ),
+    );
+    const sessions = await m.find(ClassSessionEntity, {
+      where: {
+        tenantId: student.tenantId,
+        studyGroupId,
+        configurationId: In(configs.map((config) => config.id)),
+        sessionDate: MoreThanOrEqual(today),
+        status: 'scheduled',
+      },
+    });
+    const withAttendance = await this.attendanceSessionIds(m, sessions);
+    // Keep completed, started, and manually protected session rosters intact.
+    for (const session of sessions) {
+      if (
+        this.protected(session) ||
+        withAttendance.has(session.id) ||
+        (session.sessionDate === today && session.startTime <= time)
+      )
+        continue;
+      await m.save(
+        m.create(ClassSessionStudentEntity, {
+          sessionId: session.id,
+          studentId: student.id,
+          name: student.name,
+          school: student.school,
+          educationLevel: student.educationLevel,
+          status: null,
+          note: null,
+        }),
+      );
+    }
+  }
   async history(user: AuthenticatedUser, id: string) {
     if (
       !(await this.db.manager.findOneBy(StudyGroupEntity, {

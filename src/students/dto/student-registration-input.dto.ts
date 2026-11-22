@@ -60,6 +60,14 @@ export class NewStudentParentDto {
 
 export class CreateStudentRegistrationDto {
   @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Optional active study group for initial enrollment.',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  studyGroupId?: string;
+
+  @ApiPropertyOptional({
     type: Number,
     nullable: true,
     minimum: 1,

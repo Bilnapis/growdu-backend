@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { ConfigurationsService } from '../class-sessions/configurations.service.js';
+import { ClassSessionsService } from '../class-sessions/class-sessions.service.js';
 import { isDuplicateEntryError } from '../common/database/database-error.util.js';
 import { EntityStatus } from '../common/enums/entity-status.enum.js';
 import { PasswordHashService } from '../common/security/password-hash.service.js';
@@ -30,6 +32,8 @@ export class StudentRegistrationService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly passwordHashService: PasswordHashService,
+    private readonly configurations: ConfigurationsService,
+    private readonly sessions: ClassSessionsService,
   ) {}
 
   async create(
@@ -42,6 +46,8 @@ export class StudentRegistrationService {
 
     try {
       return await this.dataSource.transaction(async (manager) => {
+        // Match scheduling writes: acquire the tenant lock before inserting related rows.
+        if (dto.studyGroupId) await this.sessions.lockTenant(manager, tenantId);
         let parent: ParentEntity;
 
         if (dto.parentSource === StudentParentSource.New) {
@@ -106,6 +112,14 @@ export class StudentRegistrationService {
         });
         setStudentMonthlyFee(newStudent, dto.monthlyFee ?? null);
         const student = await manager.save(newStudent);
+
+        if (dto.studyGroupId) {
+          await this.configurations.enrollNewStudent(
+            manager,
+            student,
+            dto.studyGroupId,
+          );
+        }
 
         await manager.save(
           manager.create(StudentParentEntity, {
