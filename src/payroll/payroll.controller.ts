@@ -44,6 +44,7 @@ import {
 } from '../common/storage/payment-proof-storage.js';
 import {
   GeneratePayrollDto,
+  GeneratePayrollMonthDto,
   PayrollQueryDto,
   PayrollVersionDto,
   RecordPayrollPaymentDto,
@@ -133,9 +134,32 @@ export class PayrollController {
     await pipeline(Readable.from(this.payroll.export(u.tenantId, q)), res);
   }
   @Post('generations')
+  @ApiOperation({
+    summary: 'Generate payroll manually after the session period ends',
+    description:
+      'Manual generation does not require the scheduled payment date to have arrived. Automatic generation continues to follow the scheduled payment date. Existing payrolls are skipped.',
+  })
   @ApiCreatedResponse({ type: PayrollGenerationResponseDto })
   generate(@CurrentUser() u: AuthenticatedUser, @Body() d: GeneratePayrollDto) {
     return this.generation.generate(u.tenantId, d.periodId, u.id, d.tutorId);
+  }
+  @Post('generations/by-month')
+  @ApiOperation({
+    summary: 'Generate payroll for a completed session month',
+    description:
+      'Creates a missing calendar period using the configured payday in the following month. Existing period dates and payrolls are preserved. The automatic schedule is not backfilled.',
+  })
+  @ApiCreatedResponse({ type: PayrollGenerationResponseDto })
+  generateMonth(
+    @CurrentUser() u: AuthenticatedUser,
+    @Body() d: GeneratePayrollMonthDto,
+  ) {
+    return this.generation.generateMonth(
+      u.tenantId,
+      d.sessionMonth,
+      u.id,
+      d.tutorId,
+    );
   }
   @Get(':id')
   @ApiOkResponse({ type: PayrollDetailResponseDto })

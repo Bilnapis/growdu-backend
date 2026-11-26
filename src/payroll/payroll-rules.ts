@@ -65,29 +65,23 @@ export function monthOffset(date: string, offset: number): string {
   );
   return value.toISOString().slice(0, 7);
 }
-export function nextPayDate(
-  today: string,
-  day: number,
-  start?: string,
-): string {
-  let candidate = billingDueDate(today.slice(0, 7), day);
-  if (candidate < today || (start !== undefined && candidate <= start))
-    candidate = billingDueDate(monthOffset(today, 1), day);
-  return candidate;
+export function nextPayDate(today: string, day: number): string {
+  const candidate = billingDueDate(today.slice(0, 7), day);
+  return candidate < today
+    ? billingDueDate(monthOffset(today, 1), day)
+    : candidate;
+}
+/** The payment month always settles the entire preceding calendar month. */
+export function calendarCycle(payDate: string) {
+  return {
+    startDate: `${monthOffset(payDate, -1)}-01`,
+    endDate: shiftCalendarDate(`${payDate.slice(0, 7)}-01`, -1),
+    payDate,
+  };
 }
 export function firstCycle(today: string, day: number) {
-  const payDate = nextPayDate(today, day);
-  return {
-    startDate: billingDueDate(monthOffset(payDate, -1), day),
-    endDate: shiftCalendarDate(payDate, -1),
-    payDate,
-  };
+  return calendarCycle(nextPayDate(today, day));
 }
 export function followingCycle(previousPayDate: string, day: number) {
-  const payDate = billingDueDate(monthOffset(previousPayDate, 1), day);
-  return {
-    startDate: previousPayDate,
-    endDate: shiftCalendarDate(payDate, -1),
-    payDate,
-  };
+  return calendarCycle(billingDueDate(monthOffset(previousPayDate, 1), day));
 }

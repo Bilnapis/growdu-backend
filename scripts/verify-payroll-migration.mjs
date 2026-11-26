@@ -2,6 +2,7 @@ import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import mysql from 'mysql2/promise';
+import { readdir } from 'node:fs/promises';
 
 const databaseName = `growdu_payroll_migration_${process.pid}_${Date.now()}`;
 const safeName = /^growdu_payroll_migration_\d+_\d+$/;
@@ -22,6 +23,14 @@ try {
   created = true;
   process.env.DB_NAME = databaseName;
   ({ default: db } = await import('../src/database/data-source.ts'));
+  const migrationFiles = await readdir('src/database/migrations');
+  db.setOptions({
+    migrations: migrationFiles
+      .filter(
+        (name) => name.endsWith('.ts') && name.slice(0, 14) <= '20261116000000',
+      )
+      .map((name) => `src/database/migrations/${name}`),
+  });
   await db.initialize();
   await db.runMigrations();
   const [latest] = await db.query(

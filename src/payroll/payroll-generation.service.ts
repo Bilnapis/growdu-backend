@@ -19,21 +19,36 @@ export class PayrollGenerationService {
     private readonly store: PayrollStore,
     private readonly periods: PayrollPeriodsService,
   ) {}
+  async generateMonth(
+    tenantId: string,
+    sessionMonth: string,
+    actorId: string,
+    tutorId?: string,
+    now = new Date(),
+  ) {
+    await this.periods.ensureDefaults(tenantId, now);
+    return this.generate(tenantId, { sessionMonth }, actorId, tutorId, now);
+  }
   async generate(
     tenantId: string,
-    periodId: string,
+    target: string | { sessionMonth: string },
     actorId: string | null,
     tutorId?: string,
     now = new Date(),
   ) {
     return this.store.db.transaction(async (m) => {
       const tenant = await this.store.lockTenant(m, tenantId);
-      const period = await this.periods.require(
-        m,
-        tenantId,
-        periodId,
-        jakartaDate(now),
-      );
+      const today = jakartaDate(now);
+      const period =
+        typeof target === 'string'
+          ? await this.periods.require(m, tenantId, target, today)
+          : await this.periods.forMonth(
+              m,
+              tenantId,
+              target.sessionMonth,
+              today,
+            );
+      const periodId = period.id;
       const tutors = await m.find(TutorEntity, {
         where: { tenantId, ...(tutorId ? { id: tutorId } : {}) },
         order: { id: 'ASC' },

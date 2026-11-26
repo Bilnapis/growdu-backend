@@ -30,7 +30,7 @@ import { PayrollGenerationService } from '../src/payroll/payroll-generation.serv
 import { PayrollAutomationService } from '../src/payroll/payroll-automation.service.js';
 import type { PayrollDetailResponseDto } from '../src/payroll/dto/payroll-response.dto.js';
 import { CreatePayroll20261116000000 } from '../src/database/migrations/20261116000000-CreatePayroll.js';
-import { firstCycle } from '../src/payroll/payroll-rules.js';
+import { firstCycle, monthOffset } from '../src/payroll/payroll-rules.js';
 
 describe('Payroll API (MySQL)', () => {
   let app: NestExpressApplication;
@@ -99,7 +99,10 @@ describe('Payroll API (MySQL)', () => {
     if (directory) await rm(directory, { recursive: true, force: true });
   });
 
-  async function scenario() {
+  async function scenario(
+    now = new Date(),
+    payday = Number(jakartaDate(now).slice(8)),
+  ) {
     const tenant = await db.manager.save(TenantEntity, {
       ownerId,
       name: 'Payroll Bimbel',
@@ -137,10 +140,14 @@ describe('Payroll API (MySQL)', () => {
       administrativeStatus: EntityStatus.Active,
       status: EntityStatus.Active,
     });
-    const settings = await app.get(PayrollPeriodsService).update(tenant.id, {
-      payday: Number(jakartaDate().slice(8)),
-      enabled: false,
-    });
+    const settings = await app.get(PayrollPeriodsService).update(
+      tenant.id,
+      {
+        payday,
+        enabled: false,
+      },
+      now,
+    );
     const period = settings.nextPeriod;
     if (!period) throw new Error('Missing fixture payroll period');
     const groups = [] as { id: string; configuration: string; rule: string }[];
@@ -209,7 +216,11 @@ describe('Payroll API (MySQL)', () => {
       });
       return row;
     }
-    const sessions = [await session(0), await session(0), await session(1)];
+    const sessions = [
+      await session(0, period.startDate),
+      await session(0),
+      await session(1),
+    ];
     const headers = auth(ownerToken, tenant.id);
     const generate = () =>
       api()
@@ -270,6 +281,7 @@ describe('Payroll API (MySQL)', () => {
   it('generates once under concurrency, counts sessions rather than students, and preserves source ownership', async () => {
     const s = await scenario();
     await s.session(0, shiftCalendarDate(s.period.startDate, -1));
+    await s.session(0, shiftCalendarDate(s.period.endDate, 1));
     await s.session(0, s.period.endDate, 'scheduled');
     await s.session(0, s.period.endDate, 'cancelled');
     const missing = await db.manager.save(TutorEntity, {
@@ -329,7 +341,7 @@ describe('Payroll API (MySQL)', () => {
       where: { tenantId: s.tenant.id },
       order: { payDate: 'DESC' },
     });
-    expect(next.startDate).toBe(s.period.payDate);
+    expect(next.startDate).toBe(`${s.period.payDate.slice(0, 7)}-01`);
     await api()
       .post('/api/v1/payroll/generations')
       .set(s.headers)
@@ -654,6 +666,152 @@ describe('Payroll API (MySQL)', () => {
     await api().get('/api/v1/payroll/tutor-options').set(denied).expect(200);
   });
 
+  it('backfills a missing session month atomically without duplicating payrolls or changing the automatic schedule', async () => {
+    const s = await scenario();
+    const foreign = await scenario();
+    const month = monthOffset(s.period.startDate, -1);
+    const before = await app.get(PayrollPeriodsService).list(s.tenant.id);
+    await s.session(0, `${month}-01`);
+    const requestMonth = (body: object) =>
+      api()
+        .post('/api/v1/payroll/generations/by-month')
+        .set(s.headers)
+        .send(body);
+    for (const sessionMonth of [
+      jakartaDate().slice(0, 7),
+      monthOffset(jakartaDate(), 1),
+      '2026-13',
+      '2026-1',
+      '0000-01',
+    ]) {
+      await requestMonth({ sessionMonth }).expect(400);
+    }
+    await requestMonth({
+      sessionMonth: month,
+      tutorId: foreign.tutor.id,
+    }).expect(404);
+    expect(await app.get(PayrollPeriodsService).list(s.tenant.id)).toEqual(
+      before,
+    );
+    await requestMonth({
+      sessionMonth: month,
+      tenantId: foreign.tenant.id,
+    }).expect(400);
+    const results = await Promise.all([
+      requestMonth({ sessionMonth: month, tutorId: s.tutor.id }).expect(201),
+      requestMonth({ sessionMonth: month, tutorId: s.tutor.id }).expect(201),
+    ]);
+    expect(results.reduce((count, r) => count + r.body.created, 0)).toBe(1);
+    expect(results[0].body.periodId).toBe(results[1].body.periodId);
+    const periods = await app.get(PayrollPeriodsService).list(s.tenant.id);
+    expect(periods).toHaveLength(before.length + 1);
+    expect(periods.find((p) => p.id === s.period.id)).toEqual(before[0]);
+    const added = periods.find((p) => p.id === results[0].body.periodId);
+    if (!added) throw new Error('Missing manually generated period');
+    expect(added.startDate).toBe(`${month}-01`);
+    expect(added.payDate.slice(0, 7)).toBe(s.period.startDate.slice(0, 7));
+    const row = await db.manager.findOneByOrFail(PayrollEntity, {
+      periodId: added.id,
+      tenantId: s.tenant.id,
+    });
+    expect(row.total).toBe('50000.25');
+    expect(row.paidAt).toBeNull();
+    // Reusing a month after changing the payday preserves its issued dates.
+    const payday = Number(jakartaDate().slice(8)) === 1 ? 2 : 1;
+    await app
+      .get(PayrollPeriodsService)
+      .update(s.tenant.id, { payday, enabled: false });
+    const repeated = await requestMonth({ sessionMonth: month }).expect(201);
+    expect(repeated.body.created).toBe(0);
+    expect(repeated.body.skippedExisting).toBe(1);
+    expect(
+      await db.manager.findOneByOrFail(PayrollEntity, { id: row.id }),
+    ).toEqual(row);
+    expect(
+      await db.manager.countBy(PayrollPeriodEntity, { tenantId: s.tenant.id }),
+    ).toBe(before.length + 1);
+  });
+
+  it('allows manual payroll at the WIB month boundary while automation waits for payday and preserves it', async () => {
+    const s = await scenario(new Date('2026-11-23T00:00:00Z'), 23);
+    const periods = app.get(PayrollPeriodsService);
+    const generation = app.get(PayrollGenerationService);
+    const automation = app.get(PayrollAutomationService);
+    expect(s.period).toMatchObject({
+      startDate: '2026-10-01',
+      endDate: '2026-10-31',
+      payDate: '2026-11-23',
+    });
+    await periods.update(
+      s.tenant.id,
+      { payday: 23, enabled: true },
+      new Date('2026-11-01T00:00:00Z'),
+    );
+    const spy = vi.spyOn(generation, 'generate');
+    try {
+      const beforeEnd = new Date('2026-10-31T16:59:59Z');
+      await expect(
+        generation.generate(
+          s.tenant.id,
+          s.period.id,
+          null,
+          s.tutor.id,
+          beforeEnd,
+        ),
+      ).rejects.toThrow('setelah periode sesi berakhir');
+      const early = new Date('2026-10-31T17:00:00Z');
+      spy.mockClear();
+      await automation.run(early);
+      expect(
+        spy.mock.calls.filter(([tenantId]) => tenantId === s.tenant.id),
+      ).toHaveLength(0);
+      expect(
+        (
+          await generation.generate(
+            s.tenant.id,
+            s.period.id,
+            null,
+            s.tutor.id,
+            early,
+          )
+        ).created,
+      ).toBe(1);
+      const original = await db.manager.findOneByOrFail(PayrollEntity, {
+        tenantId: s.tenant.id,
+        periodId: s.period.id,
+        tutorId: s.tutor.id,
+      });
+      expect(original.paidAt).toBeNull();
+      expect(original.payDate).toBe('2026-11-23');
+      expect(original.issuedDate).toBe('2026-11-01');
+      await db.manager.update(TutorEntity, s.tutor.id, {
+        sessionRate: '99999.00',
+      });
+      spy.mockClear();
+      await automation.run(new Date('2026-11-22T17:00:00Z'));
+      expect(
+        spy.mock.calls.filter(([tenantId]) => tenantId === s.tenant.id),
+      ).toHaveLength(1);
+      expect(
+        await db.manager.findOneByOrFail(PayrollEntity, { id: original.id }),
+      ).toEqual(original);
+      expect(
+        await db.manager.countBy(PayrollEntity, {
+          tenantId: s.tenant.id,
+          periodId: s.period.id,
+        }),
+      ).toBe(1);
+      expect(await periods.list(s.tenant.id)).toHaveLength(2);
+    } finally {
+      spy.mockRestore();
+      await periods.update(
+        s.tenant.id,
+        { payday: 23, enabled: false },
+        new Date('2026-11-23T00:00:00Z'),
+      );
+    }
+  });
+
   it('changes only the unissued cycle and recovers missed automatic cycles once', async () => {
     const tenant = await db.manager.save(TenantEntity, {
       ownerId,
@@ -672,9 +830,19 @@ describe('Payroll API (MySQL)', () => {
       new Date('2026-11-15T00:00:00Z'),
     );
     expect(settings.nextPeriod).toMatchObject({
-      startDate: '2026-11-05',
-      endDate: '2026-12-09',
+      startDate: '2026-11-01',
+      endDate: '2026-11-30',
       payDate: '2026-12-10',
+    });
+    settings = await periods.update(
+      tenant.id,
+      { payday: 5, enabled: true },
+      new Date('2026-12-07T00:00:00Z'),
+    );
+    expect(settings.nextPeriod).toMatchObject({
+      startDate: '2026-11-01',
+      endDate: '2026-11-30',
+      payDate: '2026-12-05',
     });
     const firstId = settings.nextPeriod!.id;
     await app
@@ -692,18 +860,27 @@ describe('Payroll API (MySQL)', () => {
       new Date('2026-12-11T00:00:00Z'),
     );
     expect(settings.nextPeriod).toMatchObject({
-      startDate: '2026-12-10',
-      endDate: '2026-12-19',
-      payDate: '2026-12-20',
+      startDate: '2026-12-01',
+      endDate: '2026-12-31',
+      payDate: '2027-01-20',
     });
     expect(
       (await db.manager.findOneByOrFail(PayrollPeriodEntity, { id: firstId }))
         .payDate,
-    ).toBe('2026-12-10');
+    ).toBe('2026-12-05');
     const automation = app.get(PayrollAutomationService);
+    const generationService = app.get(PayrollGenerationService);
+    const generate = generationService.generate.bind(generationService);
+    let failed = false;
     const generation = vi
-      .spyOn(app.get(PayrollGenerationService), 'generate')
-      .mockRejectedValueOnce(new Error('Temporary failure'));
+      .spyOn(generationService, 'generate')
+      .mockImplementation(async (...args) => {
+        if (args[0] === tenant.id && !failed) {
+          failed = true;
+          throw new Error('Temporary failure');
+        }
+        return generate(...args);
+      });
     await automation.run(new Date('2027-02-21T00:00:00Z'));
     expect(
       (await periods.list(tenant.id)).filter((p) => p.processedAt),
@@ -711,7 +888,7 @@ describe('Payroll API (MySQL)', () => {
     await automation.run(new Date('2027-02-21T00:00:00Z'));
     generation.mockRestore();
     const list = await periods.list(tenant.id);
-    expect(list.filter((p) => p.processedAt)).toHaveLength(4);
+    expect(list.filter((p) => p.processedAt)).toHaveLength(3);
     expect(list[0].payDate).toBe('2027-03-20');
     await automation.run(new Date('2027-02-21T00:00:00Z'));
     expect(await periods.list(tenant.id)).toHaveLength(list.length);

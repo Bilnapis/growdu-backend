@@ -29,6 +29,7 @@
     "migration:generate": "npm run typeorm -- migration:generate",
     "migration:show": "npm run typeorm -- migration:show",
     "migration:verify:invoices": "node --loader ts-node/esm scripts/verify-invoice-migration.mjs",
+    "migration:verify:payroll-calendar": "node --loader ts-node/esm scripts/verify-calendar-payroll-migration.mjs",
     "migration:verify:payroll": "node --loader ts-node/esm scripts/verify-payroll-migration.mjs",
     "migration:verify:learning-reports": "node --loader ts-node/esm scripts/verify-learning-report-migration.mjs",
     "migration:verify": "node --loader ts-node/esm scripts/verify-migration.mjs",

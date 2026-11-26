@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { UseCalendarPayrollPeriods20261123000000 } from '../src/database/migrations/20261123000000-UseCalendarPayrollPeriods.js';
 import { CreateLearningReports20261122000000 } from '../src/database/migrations/20261122000000-CreateLearningReports.js';
 import { CreatePayroll20261116000000 } from '../src/database/migrations/20261116000000-CreatePayroll.js';
 import { CreateInvoices20261115000000 } from '../src/database/migrations/20261115000000-CreateInvoices.js';
@@ -66,6 +67,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
         CreateInvoices20261115000000,
         CreatePayroll20261116000000,
         CreateLearningReports20261122000000,
+        UseCalendarPayrollPeriods20261123000000,
       ],
       synchronize: false,
       migrationsRun: false,

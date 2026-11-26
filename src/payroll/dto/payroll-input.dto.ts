@@ -44,7 +44,12 @@ export class PayrollQueryDto extends PaginationQueryDto {
   status?: PayrollStatus;
 }
 export class UpdatePayrollSettingsDto {
-  @ApiProperty({ minimum: 1, maximum: 31 })
+  @ApiProperty({
+    minimum: 1,
+    maximum: 31,
+    description:
+      'Monthly generation and due date for the previous calendar month. Changes preserve the open period payment month, even when the new date has passed.',
+  })
   @IsInt()
   @Min(1)
   @Max(31)
@@ -53,6 +58,19 @@ export class UpdatePayrollSettingsDto {
 }
 export class GeneratePayrollDto {
   @ApiProperty({ format: 'uuid' }) @IsUUID() periodId: string;
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  tutorId?: string;
+}
+export class GeneratePayrollMonthDto {
+  @ApiProperty({
+    example: '2026-10',
+    description:
+      'Completed session month, independent of whether its payroll period already exists.',
+  })
+  @Matches(/^[1-9]\d{3}-(0[1-9]|1[0-2])$/)
+  sessionMonth: string;
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID()

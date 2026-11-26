@@ -3,13 +3,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EntityManager } from 'typeorm';
-import { jakartaDate, shiftCalendarDate } from '../common/jakarta-date.js';
+import { EntityManager, MoreThan } from 'typeorm';
+import { billingDueDate, jakartaDate } from '../common/jakarta-date.js';
 import {
   PayrollPeriodEntity,
   PayrollSettingsEntity,
 } from './entities/payroll.entity.js';
-import { firstCycle, followingCycle, nextPayDate } from './payroll-rules.js';
+import {
+  calendarCycle,
+  firstCycle,
+  followingCycle,
+  monthOffset,
+} from './payroll-rules.js';
 import { PayrollStore } from './payroll-store.service.js';
 import type { UpdatePayrollSettingsDto } from './dto/payroll-input.dto.js';
 
@@ -108,8 +113,7 @@ export class PayrollPeriodsService {
           throw new BadRequestException(
             'Siklus berjalan tidak tersedia. Muat ulang pengaturan.',
           );
-        open.payDate = nextPayDate(today, dto.payday, open.startDate);
-        open.endDate = shiftCalendarDate(open.payDate, -1);
+        open.payDate = billingDueDate(open.payDate.slice(0, 7), dto.payday);
         await m.save(open);
       }
       settings.payday = dto.payday;
@@ -122,11 +126,42 @@ export class PayrollPeriodsService {
     const period = await m.findOneBy(PayrollPeriodEntity, { tenantId, id });
     if (!period)
       throw new NotFoundException('Periode penggajian tidak ditemukan.');
-    if (period.payDate > today || period.endDate >= today)
+    if (period.endDate >= today)
       throw new BadRequestException(
-        'Penggajian hanya dapat dibuat untuk siklus yang sudah berakhir.',
+        'Penggajian hanya dapat dibuat setelah periode sesi berakhir.',
       );
     return period;
+  }
+  /** Caller holds the tenant lock for both period resolution and generation. */
+  async forMonth(
+    m: EntityManager,
+    tenantId: string,
+    month: string,
+    today: string,
+  ) {
+    if (month >= today.slice(0, 7))
+      throw new BadRequestException('Pilih bulan sesi yang sudah selesai.');
+    const settings = await m.findOneByOrFail(PayrollSettingsEntity, {
+      tenantId,
+    });
+    const cycle = calendarCycle(
+      billingDueDate(monthOffset(`${month}-01`, 1), settings.payday),
+    );
+    const existing = await m.findOneBy(PayrollPeriodEntity, {
+      tenantId,
+      startDate: cycle.startDate,
+      endDate: cycle.endDate,
+    });
+    if (existing) return this.require(m, tenantId, existing.id, today);
+    return m.save(
+      PayrollPeriodEntity,
+      m.create(PayrollPeriodEntity, {
+        tenantId,
+        ...cycle,
+        generatedAt: null,
+        processedAt: null,
+      }),
+    );
   }
   async close(
     m: EntityManager,
@@ -140,15 +175,22 @@ export class PayrollPeriodsService {
       const settings = await m.findOneByOrFail(PayrollSettingsEntity, {
         tenantId: period.tenantId,
       });
-      await m.save(
-        PayrollPeriodEntity,
-        m.create(PayrollPeriodEntity, {
-          tenantId: period.tenantId,
-          ...followingCycle(period.payDate, settings.payday),
-          generatedAt: null,
-          processedAt: null,
-        }),
-      );
+      // Backfilled months must not insert cycles into an existing automation schedule.
+      const later = await m.existsBy(PayrollPeriodEntity, {
+        tenantId: period.tenantId,
+        payDate: MoreThan(period.payDate),
+      });
+      if (!later) {
+        await m.save(
+          PayrollPeriodEntity,
+          m.create(PayrollPeriodEntity, {
+            tenantId: period.tenantId,
+            ...followingCycle(period.payDate, settings.payday),
+            generatedAt: null,
+            processedAt: null,
+          }),
+        );
+      }
     }
     await m.save(period);
   }

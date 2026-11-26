@@ -3,8 +3,17 @@ import type { PayrollItemKind, PayrollStatus } from '../payroll-rules.js';
 
 export class PayrollPeriodResponseDto {
   @ApiProperty() id: string;
-  @ApiProperty({ format: 'date' }) startDate: string;
-  @ApiProperty({ format: 'date' }) endDate: string;
+  @ApiProperty({
+    format: 'date',
+    description:
+      'First day of the session month, preceding the scheduled payment month. Historical payrolls retain their original range.',
+  })
+  startDate: string;
+  @ApiProperty({
+    format: 'date',
+    description: 'Last day of the session month, inclusive.',
+  })
+  endDate: string;
   @ApiProperty({ format: 'date' }) payDate: string;
   @ApiProperty({ type: Date, nullable: true }) generatedAt: Date | null;
 }
